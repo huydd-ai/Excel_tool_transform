@@ -2,6 +2,7 @@
 import argparse
 import math
 import os
+import re
 import sys
 
 try:
@@ -55,6 +56,31 @@ def read_sheet_as_dicts(wb, sheet_name):
     return records, None
 
 
+def parse_swipe_coords(hint):
+    """Parse '(x1,y1)-(x2,y2)' or 'x1,y1,x2,y2' → ((x1,y1),(x2,y2)) or None."""
+    m = re.match(r'\((\d+)\s*,\s*(\d+)\)\s*-\s*\((\d+)\s*,\s*(\d+)\)', hint.strip())
+    if m:
+        return (int(m.group(1)), int(m.group(2))), (int(m.group(3)), int(m.group(4)))
+    parts = [p.strip() for p in hint.split(",")]
+    if len(parts) == 4:
+        try:
+            return (int(parts[0]), int(parts[1])), (int(parts[2]), int(parts[3]))
+        except ValueError:
+            pass
+    return None
+
+
+def validate_assets(repo, base_dir, invalid_assets):
+    for name, asset in repo.items():
+        img = asset.get("image_path", "")
+        if not img or img.upper() == "NONE":
+            continue
+        full = img if os.path.isabs(img) else os.path.join(base_dir, img)
+        if not os.path.isfile(full):
+            invalid_assets.append({"component": name, "path": img})
+            print(f"WARNING: Asset not found: {img} (component: {name})")
+
+
 def build_object_repository(wb):
     records, err = read_sheet_as_dicts(wb, "Object_Repository")
     if err:
@@ -94,12 +120,17 @@ def generate_step_code(step, repo, skipped, missing_assets):
             hint = repo[target].get("position_hint", "")
         elif target:
             hint = target
-        swipe_comment = f"  # position_hint: {hint}" if hint else ""
-        lines.append(f"swipe(start, end){swipe_comment}")
+        coords = parse_swipe_coords(hint) if hint else None
+        if coords:
+            lines.append(f"swipe({coords[0]}, {coords[1]})")
+        else:
+            skipped.append({"step_id": step_id, "reason": f"SWIPE_COORDS_MISSING '{target}'"})
+            lines.append(f"# TODO: SWIPE_COORDS_MISSING — set position_hint 'x1,y1,x2,y2' for '{target}'")
         return lines, None
 
     if action == "INPUT_TEXT":
-        lines.append(f'text("{notes}")')
+        data = safe_str(step.get("data", "")) or notes
+        lines.append(f'text("{data}")')
         return lines, None
 
     if action in ("CLICK", "ASSERT_EXISTS"):
@@ -136,6 +167,10 @@ def generate_script(excel_file, sheet_name, output_dir, plan, write_report):
     wb = openpyxl.load_workbook(excel_file, data_only=True)
 
     repo = build_object_repository(wb)
+
+    base_dir = os.path.dirname(os.path.abspath(excel_file))
+    invalid_assets = []
+    validate_assets(repo, base_dir, invalid_assets)
 
     steps, err = read_sheet_as_dicts(wb, sheet_name)
     if err:
@@ -198,11 +233,19 @@ if __name__ == "__main__":
             report_lines.append("  (none)")
         report_lines.append("")
 
-        report_lines.append("--- Missing Assets ---")
+        report_lines.append("--- Missing Assets (not in Object_Repository) ---")
         unique_missing = sorted(set(missing_assets))
         if unique_missing:
             for a in unique_missing:
                 report_lines.append(f"  {a}")
+        else:
+            report_lines.append("  (none)")
+        report_lines.append("")
+
+        report_lines.append("--- Invalid Assets (file not found on disk) ---")
+        if invalid_assets:
+            for a in invalid_assets:
+                report_lines.append(f"  {a['component']}: {a['path']}")
         else:
             report_lines.append("  (none)")
 
