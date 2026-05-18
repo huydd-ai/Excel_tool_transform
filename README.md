@@ -59,22 +59,22 @@ python -m airtest run out/daily_mission/Test_Execution.air
 
 ### Sheet `Object_Repository`
 
-| component_name | page_id | image_path | threshold | position_hint |
-|----------------|---------|------------|-----------|---------------|
-| store_btn | home | ./assets/home/btn_store.png | 0.7 | |
-| swipe_area | game | | | 100,200,300,400 |
-
-`position_hint` format for SWIPE: `x1,y1,x2,y2` or `(x1,y1)-(x2,y2)`
+| component_name | page_id | image_path | threshold |
+|----------------|---------|------------|-----------|
+| store_btn | home | ./assets/home/btn_store.png | 0.7 |
 
 ### Sheet `Test_Execution`
 
-| step_id | action | target | wait_after | data | notes |
-|---------|--------|--------|------------|------|-------|
-| 1 | CLICK | store_btn | 2 | | Open store |
-| 2 | ASSERT_EXISTS | store_header | 3 | | |
-| 3 | WAIT | | 1 | | |
-| 4 | SWIPE | swipe_area | 1 | | Scroll down |
-| 5 | INPUT_TEXT | | 0 | hello@example.com | Enter email |
+| step_id | action | target | wait_after | input_value | start_pos | end_pos | notes |
+|---------|--------|--------|------------|-------------|-----------|---------|-------|
+| 1 | CLICK | store_btn | 2 | | | | Open store |
+| 2 | ASSERT_EXISTS | store_header | 3 | | | | |
+| 3 | WAIT | | 1 | | | | |
+| 4 | SWIPE | | 1 | | 100,200 | 300,400 | Scroll down |
+| 5 | INPUT_TEXT | | 0 | hello@example.com | | | Enter email |
+
+- `start_pos` / `end_pos`: `"x,y"` format for SWIPE
+- `input_value`: text to type for INPUT_TEXT
 
 ### Supported Actions
 
@@ -83,8 +83,8 @@ python -m airtest run out/daily_mission/Test_Execution.air
 | `CLICK` | `touch(Template(r"<path>", threshold=<t>))` |
 | `ASSERT_EXISTS` | `assert_exists(Template(r"<path>", threshold=<t>), timeout=<wait>)` |
 | `WAIT` | `sleep(<wait_after>)` |
-| `SWIPE` | `swipe((x1,y1), (x2,y2))` — coords from `position_hint` |
-| `INPUT_TEXT` | `text("<data value>")` |
+| `SWIPE` | `swipe((x1,y1), (x2,y2))` — from `start_pos` / `end_pos` columns |
+| `INPUT_TEXT` | `text("<input_value>")` |
 
 ### Error Handling
 

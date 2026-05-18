@@ -31,7 +31,6 @@ class Asset:
     page_id: str = ""
     image_path: str = ""
     threshold: float = 0.7
-    position_hint: str = ""
 
 
 @dataclass
@@ -40,7 +39,9 @@ class Step:
     action: str
     target: str = ""
     wait_after: float = 1.0
-    data: str = ""
+    input_value: str = ""   # INPUT_TEXT source
+    start_pos: str = ""     # SWIPE start  "x,y"
+    end_pos: str = ""       # SWIPE end    "x,y"
     notes: str = ""
 
 
@@ -133,7 +134,9 @@ def parse_test_execution(wb, sheet_name: str) -> tuple[list[Step], str | None]:
             action=_str(r.get("action")).upper(),
             target=_str(r.get("target")),
             wait_after=_float(r.get("wait_after"), 1.0),
-            data=_str(r.get("data")),
+            input_value=_str(r.get("input_value")),
+            start_pos=_str(r.get("start_pos")),
+            end_pos=_str(r.get("end_pos")),
             notes=_str(r.get("notes")),
         ))
     return steps, None
@@ -156,15 +159,12 @@ def validate_assets(assets: dict[str, Asset], base_dir: str) -> list[ValidationI
     return issues
 
 
-def _parse_swipe_coords(hint: str) -> tuple | None:
-    """Parse '(x1,y1)-(x2,y2)' or 'x1,y1,x2,y2' → ((x1,y1),(x2,y2)) or None."""
-    m = re.match(r'\((\d+)\s*,\s*(\d+)\)\s*-\s*\((\d+)\s*,\s*(\d+)\)', hint.strip())
-    if m:
-        return (int(m.group(1)), int(m.group(2))), (int(m.group(3)), int(m.group(4)))
-    parts = [p.strip() for p in hint.split(",")]
-    if len(parts) == 4:
+def _parse_pos(pos: str) -> tuple[int, int] | None:
+    """Parse 'x,y' → (x, y) or None."""
+    parts = [p.strip() for p in pos.split(",")]
+    if len(parts) == 2:
         try:
-            return (int(parts[0]), int(parts[1])), (int(parts[2]), int(parts[3]))
+            return int(parts[0]), int(parts[1])
         except ValueError:
             pass
     return None
@@ -184,19 +184,18 @@ def _generate_step(step: Step, assets: dict[str, Asset]) -> tuple[list[str], Gen
             return lines, None
 
         case "SWIPE":
-            hint = assets[step.target].position_hint if step.target in assets else step.target
-            coords = _parse_swipe_coords(hint) if hint else None
-            if coords:
-                lines.append(f"swipe({coords[0]}, {coords[1]})")
+            start = _parse_pos(step.start_pos)
+            end = _parse_pos(step.end_pos)
+            if start and end:
+                lines.append(f"swipe({start}, {end})")
             else:
-                issue = GenerationIssue(step.step_id, f"SWIPE_COORDS_MISSING '{step.target}'")
-                lines.append(f"# TODO: SWIPE_COORDS_MISSING — add position_hint 'x1,y1,x2,y2' for '{step.target}'")
+                issue = GenerationIssue(step.step_id, f"SWIPE_COORDS_MISSING — start_pos='{step.start_pos}' end_pos='{step.end_pos}'")
+                lines.append(f"# TODO: SWIPE_COORDS_MISSING — fill start_pos/end_pos columns as 'x,y'")
                 return lines, issue
             return lines, None
 
         case "INPUT_TEXT":
-            value = step.data or step.notes
-            lines.append(f'text("{value}")')
+            lines.append(f'text("{step.input_value}")')
             return lines, None
 
         case "CLICK" | "ASSERT_EXISTS":
