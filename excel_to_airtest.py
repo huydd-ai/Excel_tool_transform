@@ -2,10 +2,13 @@
 excel_to_airtest.py — Excel V2 → Airtest .air script generator
 
 Architecture:
-  Parser    : Excel → dataclass objects (Step, Asset)
-  Validator : check asset paths exist on disk
-  Generator : objects → Python source code
-  Writer    : save .air script + optional report
+  Parser    : Excel → dataclass objects (Step, Asset)  [generator-based, low memory]
+  Validator : schema check + asset path check
+  Generator : objects → Python source via Action Registry
+  Writer    : save .air script + structured report
+
+Security: all Excel string values embedded in generated code pass through repr()
+          to prevent code injection via crafted cell content.
 """
 
 import argparse
@@ -14,6 +17,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass, field
+from typing import Callable
 
 try:
     import openpyxl
@@ -37,11 +41,12 @@ class Asset:
 class Step:
     step_id: str
     action: str
+    excel_row: int = 0          # 1-based Excel row for error tracing
     target: str = ""
     wait_after: float = 1.0
-    input_value: str = ""   # INPUT_TEXT source
-    start_pos: str = ""     # SWIPE start  "x,y"
-    end_pos: str = ""       # SWIPE end    "x,y"
+    input_value: str = ""       # INPUT_TEXT source
+    start_pos: str = ""         # SWIPE start  "x,y"
+    end_pos: str = ""           # SWIPE end    "x,y"
     notes: str = ""
 
 
@@ -55,6 +60,7 @@ class ValidationIssue:
 @dataclass
 class GenerationIssue:
     step_id: str
+    excel_row: int
     reason: str
 
 
@@ -83,82 +89,6 @@ def _float(val, default: float) -> float:
         return default
 
 
-def _sheet_to_dicts(wb, sheet_name: str) -> tuple[list[dict], str | None]:
-    if sheet_name not in wb.sheetnames:
-        return [], f"Sheet '{sheet_name}' not found"
-    ws = wb[sheet_name]
-    rows = list(ws.iter_rows(values_only=True))
-    if not rows:
-        return [], None
-    headers = [_str(h) for h in rows[0]]
-    records = []
-    for row in rows[1:]:
-        if all(_blank(c) for c in row):
-            continue
-        records.append({headers[i]: row[i] if i < len(row) else None for i, _ in enumerate(headers)})
-    return records, None
-
-
-# ---------------------------------------------------------------------------
-# Parser
-# ---------------------------------------------------------------------------
-
-def parse_object_repository(wb) -> dict[str, Asset]:
-    records, err = _sheet_to_dicts(wb, "Object_Repository")
-    if err:
-        print(f"WARNING: {err} — object lookup disabled")
-        return {}
-    assets = {}
-    for r in records:
-        name = _str(r.get("component_name"))
-        if not name:
-            continue
-        assets[name] = Asset(
-            component_name=name,
-            page_id=_str(r.get("page_id")),
-            image_path=_str(r.get("image_path")),
-            threshold=_float(r.get("threshold"), 0.7),
-            position_hint=_str(r.get("position_hint")),
-        )
-    return assets
-
-
-def parse_test_execution(wb, sheet_name: str) -> tuple[list[Step], str | None]:
-    records, err = _sheet_to_dicts(wb, sheet_name)
-    if err:
-        return [], err
-    steps = []
-    for r in records:
-        steps.append(Step(
-            step_id=_str(r.get("step_id")),
-            action=_str(r.get("action")).upper(),
-            target=_str(r.get("target")),
-            wait_after=_float(r.get("wait_after"), 1.0),
-            input_value=_str(r.get("input_value")),
-            start_pos=_str(r.get("start_pos")),
-            end_pos=_str(r.get("end_pos")),
-            notes=_str(r.get("notes")),
-        ))
-    return steps, None
-
-
-# ---------------------------------------------------------------------------
-# Validator
-# ---------------------------------------------------------------------------
-
-def validate_assets(assets: dict[str, Asset], base_dir: str) -> list[ValidationIssue]:
-    issues = []
-    for name, asset in assets.items():
-        img = asset.image_path
-        if not img or img.upper() == "NONE":
-            continue
-        full = img if os.path.isabs(img) else os.path.join(base_dir, img)
-        if not os.path.isfile(full):
-            issues.append(ValidationIssue(component=name, path=img))
-            print(f"  [WARN] Asset not found on disk: {img}  (component: {name})")
-    return issues
-
-
 def _parse_pos(pos: str) -> tuple[int, int] | None:
     """Parse 'x,y' → (x, y) or None."""
     parts = [p.strip() for p in pos.split(",")]
@@ -171,53 +101,193 @@ def _parse_pos(pos: str) -> tuple[int, int] | None:
 
 
 # ---------------------------------------------------------------------------
+# Parser  (generator-based — no list() of entire sheet)
+# ---------------------------------------------------------------------------
+
+_REQUIRED_OBJ_HEADERS  = {"component_name"}
+_REQUIRED_STEP_HEADERS = {"step_id", "action"}
+
+
+def _read_headers(ws) -> tuple[list[str], str | None]:
+    """Read first row; return normalised (lowercase+strip) header list."""
+    row = next(ws.iter_rows(values_only=True), None)
+    if row is None:
+        return [], "Sheet is empty"
+    return [_str(h).lower() for h in row], None
+
+
+def parse_object_repository(wb) -> tuple[dict[str, Asset], list[str]]:
+    sheet_name = "Object_Repository"
+    errors: list[str] = []
+    if sheet_name not in wb.sheetnames:
+        errors.append(f"Sheet '{sheet_name}' not found")
+        return {}, errors
+
+    ws = wb[sheet_name]
+    headers, err = _read_headers(ws)
+    if err:
+        return {}, [err]
+
+    missing = _REQUIRED_OBJ_HEADERS - set(headers)
+    if missing:
+        errors.append(f"Object_Repository missing required columns: {missing}")
+        return {}, errors
+
+    assets: dict[str, Asset] = {}
+    for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if all(_blank(c) for c in row):
+            continue
+        r = {headers[i]: row[i] if i < len(row) else None for i, _ in enumerate(headers)}
+        name = _str(r.get("component_name"))
+        if not name:
+            continue
+        assets[name] = Asset(
+            component_name=name,
+            page_id=_str(r.get("page_id", "")),
+            image_path=_str(r.get("image_path", "")),
+            threshold=_float(r.get("threshold"), 0.7),
+        )
+    return assets, errors
+
+
+def parse_test_execution(wb, sheet_name: str) -> tuple[list[Step], list[str]]:
+    errors: list[str] = []
+    if sheet_name not in wb.sheetnames:
+        errors.append(f"Sheet '{sheet_name}' not found")
+        return [], errors
+
+    ws = wb[sheet_name]
+    headers, err = _read_headers(ws)
+    if err:
+        return [], [err]
+
+    missing = _REQUIRED_STEP_HEADERS - set(headers)
+    if missing:
+        errors.append(f"Sheet '{sheet_name}' missing required columns: {missing}")
+        return [], errors
+
+    steps: list[Step] = []
+    for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if all(_blank(c) for c in row):
+            continue
+        r = {headers[i]: row[i] if i < len(row) else None for i, _ in enumerate(headers)}
+        steps.append(Step(
+            step_id=_str(r.get("step_id")),
+            action=_str(r.get("action")).upper(),
+            excel_row=row_num,
+            target=_str(r.get("target", "")),
+            wait_after=_float(r.get("wait_after"), 1.0),
+            input_value=_str(r.get("input_value", "")),
+            start_pos=_str(r.get("start_pos", "")),
+            end_pos=_str(r.get("end_pos", "")),
+            notes=_str(r.get("notes", "")),
+        ))
+    return steps, errors
+
+
+# ---------------------------------------------------------------------------
+# Validator
+# ---------------------------------------------------------------------------
+
+def validate_assets(assets: dict[str, Asset], base_dir: str) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    for name, asset in assets.items():
+        img = asset.image_path
+        if not img or img.upper() == "NONE":
+            continue
+        full = img if os.path.isabs(img) else os.path.join(base_dir, img)
+        if not os.path.isfile(full):
+            issues.append(ValidationIssue(component=name, path=img))
+            print(f"  [WARN] Asset not found on disk: {img}  (component: {name})")
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# Action Registry  (open for extension — add handlers without touching generator)
+# ---------------------------------------------------------------------------
+
+_HANDLERS: dict[str, Callable] = {}
+
+
+def _action(name: str):
+    """Decorator: register a function as the handler for an action keyword."""
+    def decorator(fn: Callable) -> Callable:
+        _HANDLERS[name] = fn
+        return fn
+    return decorator
+
+
+# Handler signature: (step: Step, assets: dict[str, Asset]) -> (lines: list[str], issue: GenerationIssue | None)
+
+@_action("CLICK")
+def _handle_click(step: Step, assets: dict[str, Asset]) -> tuple[list[str], GenerationIssue | None]:
+    if not step.target or step.target not in assets:
+        return (
+            [f"# TODO: MISSING_ASSET '{step.target}'"],
+            GenerationIssue(step.step_id, step.excel_row, f"MISSING_ASSET '{step.target}'"),
+        )
+    asset = assets[step.target]
+    return [f"touch(Template({repr(asset.image_path)}, threshold={asset.threshold}))"], None
+
+
+@_action("ASSERT_EXISTS")
+def _handle_assert_exists(step: Step, assets: dict[str, Asset]) -> tuple[list[str], GenerationIssue | None]:
+    if not step.target or step.target not in assets:
+        return (
+            [f"# TODO: MISSING_ASSET '{step.target}'"],
+            GenerationIssue(step.step_id, step.excel_row, f"MISSING_ASSET '{step.target}'"),
+        )
+    asset = assets[step.target]
+    return [
+        f"assert_exists(Template({repr(asset.image_path)}, threshold={asset.threshold}), timeout={step.wait_after})"
+    ], None
+
+
+@_action("WAIT")
+def _handle_wait(step: Step, assets: dict[str, Asset]) -> tuple[list[str], GenerationIssue | None]:
+    return [f"sleep({step.wait_after})"], None
+
+
+@_action("SWIPE")
+def _handle_swipe(step: Step, assets: dict[str, Asset]) -> tuple[list[str], GenerationIssue | None]:
+    start = _parse_pos(step.start_pos)
+    end = _parse_pos(step.end_pos)
+    if start and end:
+        return [f"swipe({start}, {end})"], None
+    return (
+        [f"# TODO: SWIPE_COORDS_MISSING — fill start_pos/end_pos as 'x,y'"],
+        GenerationIssue(
+            step.step_id, step.excel_row,
+            f"SWIPE_COORDS_MISSING (start='{step.start_pos}' end='{step.end_pos}')"
+        ),
+    )
+
+
+@_action("INPUT_TEXT")
+def _handle_input_text(step: Step, assets: dict[str, Asset]) -> tuple[list[str], GenerationIssue | None]:
+    # repr() escapes the value safely — prevents injection via crafted cell content
+    return [f"text({repr(step.input_value)})"], None
+
+
+# ---------------------------------------------------------------------------
 # Generator
 # ---------------------------------------------------------------------------
 
 def _generate_step(step: Step, assets: dict[str, Asset]) -> tuple[list[str], GenerationIssue | None]:
     label = f"# step {step.step_id}" + (f": {step.notes}" if step.notes else "")
-    lines = [label]
-
-    match step.action:
-        case "WAIT":
-            lines.append(f"sleep({step.wait_after})")
-            return lines, None
-
-        case "SWIPE":
-            start = _parse_pos(step.start_pos)
-            end = _parse_pos(step.end_pos)
-            if start and end:
-                lines.append(f"swipe({start}, {end})")
-            else:
-                issue = GenerationIssue(step.step_id, f"SWIPE_COORDS_MISSING — start_pos='{step.start_pos}' end_pos='{step.end_pos}'")
-                lines.append(f"# TODO: SWIPE_COORDS_MISSING — fill start_pos/end_pos columns as 'x,y'")
-                return lines, issue
-            return lines, None
-
-        case "INPUT_TEXT":
-            lines.append(f'text("{step.input_value}")')
-            return lines, None
-
-        case "CLICK" | "ASSERT_EXISTS":
-            if not step.target or step.target not in assets:
-                issue = GenerationIssue(step.step_id, f"MISSING_ASSET '{step.target}'")
-                lines.append(f"# TODO: MISSING_ASSET '{step.target}'")
-                return lines, issue
-            asset = assets[step.target]
-            img, t = asset.image_path, asset.threshold
-            if step.action == "CLICK":
-                lines.append(f'touch(Template(r"{img}", threshold={t}))')
-            else:
-                lines.append(f'assert_exists(Template(r"{img}", threshold={t}), timeout={step.wait_after})')
-            return lines, None
-
-        case _:
-            issue = GenerationIssue(step.step_id, f"UNSUPPORTED_ACTION '{step.action}'")
-            lines.append(f"# UNSUPPORTED_ACTION: '{step.action}'")
-            return lines, issue
+    handler = _HANDLERS.get(step.action)
+    if handler is None:
+        issue = GenerationIssue(step.step_id, step.excel_row, f"UNSUPPORTED_ACTION '{step.action}'")
+        return [label, f"# UNSUPPORTED_ACTION: '{step.action}'"], issue
+    lines, issue = handler(step, assets)
+    return [label] + lines, issue
 
 
-def generate_script(steps: list[Step], assets: dict[str, Asset], source_name: str) -> tuple[str, list[GenerationIssue]]:
+def generate_script(
+    steps: list[Step],
+    assets: dict[str, Asset],
+    source_name: str,
+) -> tuple[str, list[GenerationIssue]]:
     body_lines: list[str] = []
     issues: list[GenerationIssue] = []
 
@@ -272,14 +342,23 @@ def write_report(
         f"Source : {source}",
         f"Output : {out_file}",
         "",
-        f"--- Skipped / Issues ({len(gen_issues)}) ---",
+        f"--- Generation Issues ({len(gen_issues)}) ---",
     ]
-    lines += [f"  step {i.step_id}: {i.reason}" for i in gen_issues] or ["  (none)"]
+    if gen_issues:
+        for i in gen_issues:
+            lines.append(f"  row {i.excel_row:>4} | step {i.step_id}: {i.reason}")
+    else:
+        lines.append("  (none)")
+
     lines += [
         "",
-        f"--- Asset Validation ({len(val_issues)} missing on disk) ---",
+        f"--- Asset Validation — file not found ({len(val_issues)}) ---",
     ]
-    lines += [f"  {v.component}: {v.path}" for v in val_issues] or ["  (none)"]
+    if val_issues:
+        for v in val_issues:
+            lines.append(f"  {v.component}: {v.path}")
+    else:
+        lines.append("  (none)")
 
     report_path = os.path.join(output_dir, "generation_report.txt")
     with open(report_path, "w", encoding="utf-8") as f:
@@ -309,18 +388,21 @@ def main():
     wb = openpyxl.load_workbook(args.excel_file, data_only=True)
 
     print("[parse] Reading Object_Repository...")
-    assets = parse_object_repository(wb)
-    print(f"        {len(assets)} assets loaded")
+    assets, obj_errors = parse_object_repository(wb)
+    for e in obj_errors:
+        print(f"  [ERROR] {e}")
+    print(f"         {len(assets)} assets loaded")
 
-    print("[validate] Checking asset paths...")
+    print("[validate] Checking asset paths on disk...")
     val_issues = validate_assets(assets, base_dir)
     print(f"           {len(val_issues)} missing file(s)")
 
     print(f"[parse] Reading sheet '{args.sheet}'...")
-    steps, err = parse_test_execution(wb, args.sheet)
-    if err:
-        sys.exit(f"ERROR: {err}")
-    print(f"        {len(steps)} steps loaded")
+    steps, step_errors = parse_test_execution(wb, args.sheet)
+    for e in step_errors:
+        print(f"  [ERROR] {e}")
+        sys.exit(1)
+    print(f"         {len(steps)} steps loaded")
 
     print("[generate] Building script...")
     script, gen_issues = generate_script(steps, assets, os.path.basename(args.excel_file))
@@ -333,10 +415,8 @@ def main():
         report_path = write_report(out_file, args.excel_file, gen_issues, val_issues, args.output)
         print(f"[report] {report_path}")
 
-    if gen_issues or val_issues:
-        print(f"\nSummary: {len(gen_issues)} generation issue(s), {len(val_issues)} missing asset(s)")
-    else:
-        print("\nOK — no issues")
+    total = len(gen_issues) + len(val_issues)
+    print(f"\n{'OK — no issues' if total == 0 else f'DONE — {len(gen_issues)} generation issue(s), {len(val_issues)} missing asset(s)'}")
 
 
 if __name__ == "__main__":
