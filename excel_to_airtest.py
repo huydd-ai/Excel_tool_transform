@@ -647,7 +647,7 @@ class AirtestGenerator(metaclass=_GenMeta):
         filename = (step.params.strip() if step.params else "") or step.suite_id.lower()
         if not filename.endswith(".png"):
             filename += ".png"
-        return [f'snapshot(filename="{filename}")'], None
+        return [f"snapshot(filename={filename!r})"], None
 
     @action("STOP_APP")
     def handle_stop_app(self, step, ctx):
