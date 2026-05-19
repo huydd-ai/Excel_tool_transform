@@ -90,3 +90,25 @@ def test_classname_from_name():
     assert _classname_from_name("my_game") == "MyGame"
     assert _classname_from_name("my-game") == "MyGame"
     assert _classname_from_name("my game") == "MyGame"
+
+
+def test_list_projects_args_parse():
+    """--list-projects flag parses correctly."""
+    import argparse
+    gen = AirtestGenerator()
+    parser = argparse.ArgumentParser()
+    gen.add_arguments(parser)
+    args = parser.parse_args(["--list-projects"])
+    assert args.list_projects is True
+    assert args.excel_file is None
+
+
+def test_project_flag_selects_registered_class():
+    """--project flag parses correctly."""
+    import argparse
+    gen = AirtestGenerator()
+    parser = argparse.ArgumentParser()
+    gen.add_arguments(parser)
+    args = parser.parse_args(["myfile.xlsx", "--project", "pixon"])
+    assert args.project == "pixon"
+    assert args.excel_file == "myfile.xlsx"

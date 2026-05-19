@@ -376,6 +376,58 @@ def _discover_projects(projects_dir: str = None) -> None:
                 importlib.import_module(module_name)
 
 
+_SCAFFOLD_TEMPLATE = '''\
+# projects/{name}.py  — generated scaffold
+# Edit DEFAULT_APP_PACKAGE and IMPORTS, then run:
+#   python excel_to_airtest.py --list-projects
+# to confirm your project is discovered.
+
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from excel_to_airtest import AirtestGenerator, register_project, action
+
+
+@register_project("{name}")
+class {classname}Generator(AirtestGenerator):
+    DEFAULT_APP_PACKAGE = "com.example.{name}"   # <- change this
+    IMPORTS = "from airtest.core.api import *"    # <- change this
+    MODULE_PROLOGUE = ""                           # <- page-object singletons (optional)
+
+    # Override actions only if your framework differs from base Airtest.
+    # All base actions are inherited automatically.
+
+    # @action("TAP")
+    # def handle_tap(self, step, ctx):
+    #     asset, lines, issue = self._resolve_image(step, ctx)
+    #     if asset is None: return lines, issue
+    #     return [f"my_framework.tap({{asset.resource_path!r}})"], None
+
+    # def wrap_main_body(self, step_lines, suite_id):
+    #     return step_lines
+
+
+if __name__ == "__main__":
+    {classname}Generator.main()
+'''
+
+
+def _scaffold_project(name: str, projects_dir: str = None) -> str:
+    """Write projects/<name>.py scaffold. Raises FileExistsError if already present."""
+    if projects_dir is None:
+        projects_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "projects")
+    os.makedirs(projects_dir, exist_ok=True)
+    out_path = os.path.join(projects_dir, f"{name}.py")
+    if os.path.exists(out_path):
+        raise FileExistsError(f"Project file already exists: {out_path}")
+    classname = _classname_from_name(name)
+    content = _SCAFFOLD_TEMPLATE.format(name=name, classname=classname)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return out_path
+
+
 # --------------------------------------------------------------------------- #
 # Generator base class - subclass to retarget for any project                 #
 # --------------------------------------------------------------------------- #
@@ -598,15 +650,31 @@ class AirtestGenerator(metaclass=_GenMeta):
     # ------------------------------------------------------------------- #
 
     def add_arguments(self, parser):
-        """Subclasses may extend by overriding and calling super().add_arguments(parser)."""
-        parser.add_argument("excel_file",                                       help="Path to Excel (.xlsx) file")
-        parser.add_argument("--output",        default="./output",              help="Output root directory")
-        parser.add_argument("--plan",          default=self.DEFAULT_PLAN,       help="Subfolder under output (default: excel filename stem)")
-        parser.add_argument("--objects-sheet", default=self.OBJECTS_SHEET,      help="Object repository sheet name")
-        parser.add_argument("--actions-sheet", default=self.ACTIONS_SHEET,      help="Action logic sheet name (optional)")
-        parser.add_argument("--steps-sheet",   default=self.STEPS_SHEET,        help="Step sheet name")
-        parser.add_argument("--app-package",   default=self.DEFAULT_APP_PACKAGE, help="App package id used by START_APP")
-        parser.add_argument("--report",        action="store_true",             help="Write generation_report.txt")
+        """Subclasses may extend by calling super().add_arguments(parser) first."""
+        parser.add_argument("excel_file", nargs="?", default=None,
+                            help="Path to Excel (.xlsx) file")
+        parser.add_argument("--output",        default="./output",
+                            help="Output root directory")
+        parser.add_argument("--plan",          default=self.DEFAULT_PLAN,
+                            help="Subfolder under output (default: excel filename stem)")
+        parser.add_argument("--objects-sheet", default=self.OBJECTS_SHEET,
+                            help="Object repository sheet name")
+        parser.add_argument("--actions-sheet", default=self.ACTIONS_SHEET,
+                            help="Action logic sheet name")
+        parser.add_argument("--steps-sheet",   default=self.STEPS_SHEET,
+                            help="Step sheet name")
+        parser.add_argument("--app-package",   default=self.DEFAULT_APP_PACKAGE,
+                            help="App package id used by START_APP / STOP_APP")
+        parser.add_argument("--report",        action="store_true",
+                            help="Write generation_report.txt")
+        parser.add_argument("--project",       default=None,
+                            help="Project name to use (from projects/ directory)")
+        parser.add_argument("--list-projects", action="store_true",
+                            help="List all discovered projects and exit")
+        parser.add_argument("--init-project",  metavar="NAME",
+                            help="Scaffold projects/<NAME>.py and exit")
+        parser.add_argument("--init-excel",    action="store_true",
+                            help="Generate template.xlsx in current directory and exit")
 
     def run(self, args):
         if not os.path.isfile(args.excel_file):
@@ -662,10 +730,52 @@ class AirtestGenerator(metaclass=_GenMeta):
 
     @classmethod
     def main(cls):
-        gen = cls()
+        _discover_projects()
         parser = argparse.ArgumentParser(description=cls.DESCRIPTION)
+        gen = cls()
         gen.add_arguments(parser)
-        gen.run(parser.parse_args())
+        args = parser.parse_args()
+
+        if args.list_projects:
+            if not _PROJECT_REGISTRY:
+                print("No projects registered. Add a file to projects/ or run --init-project <name>.")
+            for name, klass in sorted(_PROJECT_REGISTRY.items()):
+                src = sys.modules.get(klass.__module__, None)
+                src_file = getattr(src, "__file__", "?") if src else "?"
+                print(f"  {name:<16} {src_file:<40} {klass.DEFAULT_APP_PACKAGE}")
+            return
+
+        if args.init_project:
+            try:
+                path = _scaffold_project(args.init_project)
+                print(f"[init-project] Created: {path}")
+                print(f"               Edit DEFAULT_APP_PACKAGE and IMPORTS, then run --list-projects.")
+            except FileExistsError as e:
+                sys.exit(f"ERROR: {e}")
+            return
+
+        if args.init_excel:
+            from templates.excel_template import generate_template
+            out = generate_template("template.xlsx")
+            print(f"[init-excel] Template written to: {out}")
+            return
+
+        # Select project class
+        gen_cls = cls
+        if args.project:
+            key = args.project.lower()
+            if key not in _PROJECT_REGISTRY:
+                known = ", ".join(sorted(_PROJECT_REGISTRY)) or "(none)"
+                sys.exit(f"ERROR: Unknown project '{args.project}'. Known: {known}. Run --list-projects.")
+            gen_cls = _PROJECT_REGISTRY[key]
+        elif len(_PROJECT_REGISTRY) == 1:
+            gen_cls = next(iter(_PROJECT_REGISTRY.values()))
+
+        if not args.excel_file:
+            parser.print_help()
+            sys.exit("\nERROR: excel_file is required.")
+
+        gen_cls().run(args)
 
 
 # --------------------------------------------------------------------------- #
