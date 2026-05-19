@@ -597,7 +597,7 @@ class AirtestGenerator(metaclass=_GenMeta):
 
     @action("SCROLL")
     def handle_scroll(self, step, ctx):
-        raw = step.params.strip() if step.params else "up"
+        raw = (step.params.strip() if step.params else "") or "up"
         try:
             direction = json.loads(raw)["direction"].lower()
         except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
@@ -639,7 +639,7 @@ class AirtestGenerator(metaclass=_GenMeta):
 
     @action("SNAPSHOT")
     def handle_snapshot(self, step, ctx):
-        filename = step.params.strip() if step.params else step.suite_id.lower()
+        filename = (step.params.strip() if step.params else "") or step.suite_id.lower()
         if not filename.endswith(".png"):
             filename += ".png"
         return [f'snapshot(filename="{filename}")'], None
