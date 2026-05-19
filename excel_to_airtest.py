@@ -376,6 +376,11 @@ def _discover_projects(projects_dir: str = None) -> None:
     parent = os.path.dirname(projects_dir)
     if parent not in sys.path:
         sys.path.insert(0, parent)
+    # When running as __main__, project files do `from excel_to_airtest import register_project`
+    # which would load a *second* copy of this module and write to a different registry.
+    # Register __main__ under the canonical name so they all share one registry.
+    if __name__ == "__main__" and "excel_to_airtest" not in sys.modules:
+        sys.modules["excel_to_airtest"] = sys.modules["__main__"]
     for fname in sorted(os.listdir(projects_dir)):
         if fname.endswith(".py") and not fname.startswith("_"):
             module_name = f"projects.{fname[:-3]}"
@@ -899,8 +904,6 @@ class AirtestGenerator(metaclass=_GenMeta):
                 known = ", ".join(sorted(_PROJECT_REGISTRY)) or "(none)"
                 sys.exit(f"ERROR: Unknown project '{args.project}'. Known: {known}. Run --list-projects.")
             gen_cls = _PROJECT_REGISTRY[key]
-        elif len(_PROJECT_REGISTRY) == 1:
-            gen_cls = next(iter(_PROJECT_REGISTRY.values()))
 
         if not args.excel_file:
             parser.print_help()
