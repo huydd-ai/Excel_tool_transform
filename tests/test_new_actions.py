@@ -163,14 +163,14 @@ def test_snapshot_with_params():
     gen = AirtestGenerator()
     lines, issue = gen._HANDLERS["SNAPSHOT"](gen, _step("SNAPSHOT", params="login_ok"), _ctx())
     assert issue is None
-    assert lines == ['snapshot(filename="login_ok.png")']
+    assert lines == ["snapshot(filename='login_ok.png')"]
 
 
 def test_snapshot_params_already_has_extension():
     gen = AirtestGenerator()
     lines, issue = gen._HANDLERS["SNAPSHOT"](gen, _step("SNAPSHOT", params="login.png"), _ctx())
     assert issue is None
-    assert lines == ['snapshot(filename="login.png")']
+    assert lines == ["snapshot(filename='login.png')"]
 
 
 def test_snapshot_no_params_uses_suite_id():
@@ -196,3 +196,25 @@ def test_stop_app_no_package_returns_todo():
     lines, issue = gen._HANDLERS["STOP_APP"](gen, _step("STOP_APP"), _ctx(pkg=""))
     assert issue is not None
     assert "STOP_APP_NEEDS_PACKAGE" in issue.reason
+
+
+def test_scroll_empty_params_defaults_to_up():
+    gen = AirtestGenerator()
+    lines, issue = gen._HANDLERS["SCROLL"](gen, _step("SCROLL", params=""), _ctx())
+    assert issue is None
+    assert "h*0.7" in lines[1]
+    assert "h*0.3" in lines[1]
+
+
+def test_snapshot_injection_safe():
+    gen = AirtestGenerator()
+    payload = 'evil"); import os; os.system("rm -rf /'
+    lines, issue = gen._HANDLERS["SNAPSHOT"](gen, _step("SNAPSHOT", params=payload), _ctx())
+    assert issue is None
+    assert lines[0].startswith("snapshot(filename=")
+    import ast
+    tree = ast.parse(lines[0], mode="eval")
+    call = tree.body
+    assert isinstance(call, ast.Call)
+    kw = call.keywords[0]
+    assert isinstance(kw.value, ast.Constant)

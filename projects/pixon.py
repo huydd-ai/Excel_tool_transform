@@ -5,6 +5,7 @@ Registered as project "pixon" via @register_project("pixon").
 Run via:
     python excel_to_airtest.py AutomationRebase.xlsx --project pixon --report
 """
+
 import json
 import os
 import sys
@@ -18,7 +19,7 @@ from excel_to_airtest import AirtestGenerator, action, register_project
 class PixonGenerator(AirtestGenerator):
     """Generator targeting the pixon test framework used by AutoRebase / Screw Land."""
 
-    DESCRIPTION         = "Convert AutomationRebase Excel to pixon-flavoured Airtest .air scripts."
+    DESCRIPTION = "Convert Excel to .air scripts."
     DEFAULT_APP_PACKAGE = "com.woodpuzzle.pin3d"
 
     IMPORTS = (
@@ -57,7 +58,7 @@ class PixonGenerator(AirtestGenerator):
             out.append("        pass")
         out += [
             "    except Exception as e:",
-            f"        wrapper.log_error(f'{suite_id} failed: ' + str(e) + chr(10) + traceback.format_exc())",
+            f"        wrapper.log_error({suite_id!r} + ' failed: ' + str(e) + chr(10) + traceback.format_exc())",
             f"        snapshot(filename={suite_id.lower() + '_error.png'!r})",
             "    finally:",
             "        teardown_app()",
@@ -69,7 +70,9 @@ class PixonGenerator(AirtestGenerator):
         asset, lines, issue = self._resolve_image(step, ctx)
         if asset is None:
             return lines, issue
-        return [f"wrapper.touch(Template({asset.resource_path!r}, threshold={asset.threshold}))"], None
+        return [
+            f"wrapper.touch(Template({asset.resource_path!r}, threshold={asset.threshold}))"
+        ], None
 
     @action("TOUCH")
     def handle_touch(self, step, ctx):
@@ -114,8 +117,10 @@ class PixonGenerator(AirtestGenerator):
             try:
                 cfg = json.loads(step.params)
                 out.append(f"# config (informational): {cfg!r}")
-            except Exception:
-                return [f"# TODO: INVALID_PARAMS_JSON: {step.params!r}"], self._issue(step, "INVALID_PARAMS_JSON")
+            except json.JSONDecodeError:
+                return [f"# TODO: INVALID_PARAMS_JSON: {step.params!r}"], self._issue(
+                    step, "INVALID_PARAMS_JSON"
+                )
         out.append("open_app_with_fake_ads(home_page)")
         return out, None
 
