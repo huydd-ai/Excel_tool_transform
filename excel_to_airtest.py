@@ -484,12 +484,26 @@ class AirtestGenerator(metaclass=_GenMeta):
     # Default action handlers (bare Airtest)                              #
     # ------------------------------------------------------------------- #
 
+    @action("TAP")
+    def handle_tap(self, step, ctx):
+        asset, lines, issue = self._resolve_image(step, ctx)
+        if asset is None:
+            return lines, issue
+        return [f"touch(Template({asset.resource_path!r}, threshold={asset.threshold}))"], None
+
+    @action("TOUCH")
+    def handle_touch(self, step, ctx):
+        return self.handle_tap(step, ctx)
+
     @action("CLICK")
     def handle_click(self, step, ctx):
         asset, lines, issue = self._resolve_image(step, ctx)
         if asset is None:
             return lines, issue
-        return [f"touch(Template({asset.resource_path!r}, threshold={asset.threshold}))"], None
+        return [
+            "# deprecated: use TAP or TOUCH",
+            f"touch(Template({asset.resource_path!r}, threshold={asset.threshold}))",
+        ], None
 
     @action("WAIT_FOR")
     def handle_wait_for(self, step, ctx):
