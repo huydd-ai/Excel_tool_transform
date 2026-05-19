@@ -577,6 +577,46 @@ class AirtestGenerator(metaclass=_GenMeta):
             f"swipe({frm}, {to})",
         ], None
 
+    @action("LONG_PRESS")
+    def handle_long_press(self, step, ctx):
+        asset, lines, issue = self._resolve_image(step, ctx)
+        if asset is None:
+            return lines, issue
+        return [f"long_click(Template({asset.resource_path!r}, threshold={asset.threshold}))"], None
+
+    @action("SLEEP")
+    def handle_sleep(self, step, ctx):
+        raw = step.params.strip() if step.params else ""
+        try:
+            if raw.startswith("{"):
+                seconds = float(json.loads(raw)["seconds"])
+            else:
+                seconds = float(raw)
+            return [f"sleep({seconds})"], None
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+            return self._todo(step, f"INVALID_SLEEP_PARAMS: {step.params!r} — provide seconds as number or {{\"seconds\": 2.5}}")
+
+    @action("BACK")
+    def handle_back(self, step, ctx):
+        return ['keyevent("BACK")'], None
+
+    @action("HOME")
+    def handle_home(self, step, ctx):
+        return ['keyevent("HOME")'], None
+
+    @action("SNAPSHOT")
+    def handle_snapshot(self, step, ctx):
+        filename = step.params.strip() if step.params else step.suite_id.lower()
+        if not filename.endswith(".png"):
+            filename += ".png"
+        return [f'snapshot(filename="{filename}")'], None
+
+    @action("STOP_APP")
+    def handle_stop_app(self, step, ctx):
+        if not ctx.app_package:
+            return self._todo(step, "STOP_APP_NEEDS_PACKAGE — pass via --app-package")
+        return [f'stop_app("{ctx.app_package}")'], None
+
     # ------------------------------------------------------------------- #
     # Generation                                                          #
     # ------------------------------------------------------------------- #
