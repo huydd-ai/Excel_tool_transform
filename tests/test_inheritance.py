@@ -65,14 +65,15 @@ def test_subclass_override_replaces_parent_handler():
     assert code_lines == ["touch(Template('b.png', threshold=0.8))"]
 
 
-def test_subclass_can_register_new_action_keyword():
+def test_subclass_can_override_existing_action_keyword():
     class Child(AirtestGenerator):
         @action("SWIPE")
         def handle_swipe(self, step, ctx):
             return [f"swipe_stub({step.params!r})"], None
 
     assert "SWIPE" in Child._HANDLERS
-    assert "SWIPE" not in AirtestGenerator._HANDLERS
+    # Child's override replaces the base handler for Child only
+    assert Child._HANDLERS["SWIPE"] is not AirtestGenerator._HANDLERS["SWIPE"]
 
     src, issues = Child().generate_suite_script(
         [_step("SWIPE", params="dx=100")],

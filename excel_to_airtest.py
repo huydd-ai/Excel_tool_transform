@@ -70,6 +70,13 @@ except ImportError:
 LOCATOR_IMAGE = "IMAGE"
 LOCATOR_OCR   = "OCR"
 
+_SCROLL_PRESETS = {
+    "up":    ("(int(w*0.5), int(h*0.7))", "(int(w*0.5), int(h*0.3))"),
+    "down":  ("(int(w*0.5), int(h*0.3))", "(int(w*0.5), int(h*0.7))"),
+    "left":  ("(int(w*0.7), int(h*0.5))", "(int(w*0.3), int(h*0.5))"),
+    "right": ("(int(w*0.3), int(h*0.5))", "(int(w*0.7), int(h*0.5))"),
+}
+
 
 @dataclass
 class Asset:
@@ -541,6 +548,34 @@ class AirtestGenerator(metaclass=_GenMeta):
     @action("READ_TEXT")
     def handle_read_text(self, step, ctx):
         return self._todo(step, f"READ_TEXT not implemented (target='{step.target}')")
+
+    @action("SWIPE")
+    def handle_swipe(self, step, ctx):
+        if not step.params:
+            return self._todo(step, 'SWIPE_NEEDS_PARAMS: provide JSON {"from":[x1,y1],"to":[x2,y2],"duration":0.5}')
+        try:
+            cfg = json.loads(step.params)
+            x1, y1 = cfg["from"]
+            x2, y2 = cfg["to"]
+            duration = cfg.get("duration", 0.5)
+            return [f"swipe(({x1}, {y1}), ({x2}, {y2}), duration={duration})"], None
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            return self._todo(step, f"INVALID_SWIPE_PARAMS: {step.params!r}")
+
+    @action("SCROLL")
+    def handle_scroll(self, step, ctx):
+        raw = step.params.strip() if step.params else "up"
+        try:
+            direction = json.loads(raw)["direction"].lower()
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
+            direction = raw.lower()
+        if direction not in _SCROLL_PRESETS:
+            return self._todo(step, f"INVALID_SCROLL_DIRECTION: '{direction}' — use up/down/left/right")
+        frm, to = _SCROLL_PRESETS[direction]
+        return [
+            "w, h = G.DEVICE.get_current_resolution()",
+            f"swipe({frm}, {to})",
+        ], None
 
     # ------------------------------------------------------------------- #
     # Generation                                                          #
