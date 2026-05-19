@@ -436,6 +436,39 @@ def _scaffold_project(name: str, projects_dir: str = None) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Diagnostic hints                                                            #
+# --------------------------------------------------------------------------- #
+
+_HINT_MAP = {
+    "MISSING_TARGET":           "fill the Target_ID cell for this step in Test_Execution sheet",
+    "START_APP_NEEDS_PACKAGE":  "pass --app-package com.your.app on the CLI",
+    "STOP_APP_NEEDS_PACKAGE":   "pass --app-package com.your.app on the CLI",
+    "INVALID_PARAMS_JSON":      "Params must be valid JSON or a plain number",
+    "SWIPE_NEEDS_PARAMS":       'provide JSON {"from":[x1,y1],"to":[x2,y2],"duration":0.5} in Params',
+    "INVALID_SWIPE_PARAMS":     'Params must be valid JSON: {"from":[x1,y1],"to":[x2,y2],"duration":0.5}',
+    "INVALID_SCROLL_DIRECTION": "use one of: up/down/left/right in the Params cell",
+    "INVALID_SLEEP_PARAMS":     'provide seconds as a number (e.g. "2.5") or {"seconds": 2.5}',
+    "READ_TEXT":                "READ_TEXT is a v2 feature — leave as TODO stub for now",
+}
+
+
+def _diagnostic_hint(reason: str) -> str:
+    """Return an actionable fix hint for a generation issue reason string."""
+    for key, hint in _HINT_MAP.items():
+        if key in reason:
+            return hint
+    if "UNKNOWN_TARGET" in reason:
+        target = reason.split("'")[1] if "'" in reason else reason
+        return f"add row with Object_ID='{target}' to Object_Repository sheet"
+    if "UNSUPPORTED_LOCATOR" in reason:
+        return "OCR locators are v2 — change Locator_Type to IMAGE or leave as TODO stub"
+    if "MISSING_RESOURCE_PATH" in reason:
+        target = reason.split("'")[1] if "'" in reason else ""
+        return f"fill Resource_Path for '{target}' in Object_Repository sheet"
+    return "check the Excel cell for this step"
+
+
+# --------------------------------------------------------------------------- #
 # Generator base class - subclass to retarget for any project                 #
 # --------------------------------------------------------------------------- #
 
@@ -815,6 +848,15 @@ class AirtestGenerator(metaclass=_GenMeta):
             print(f"[report] {report}")
 
         total = len(gen_issues) + len(val_issues)
+        if gen_issues or val_issues:
+            print(f"\n[issues] {len(gen_issues) + len(val_issues)} problem(s) found:")
+            for i in gen_issues:
+                hint = _diagnostic_hint(i.reason)
+                print(f"  row {i.excel_row:>4} | {i.suite_id} | step {i.step_no} | {i.reason}")
+                print(f"          -> fix: {hint}")
+            for v in val_issues:
+                print(f"  asset    | {v.component}: {v.path}")
+                print(f"          -> fix: copy or create this image file at the listed path")
         print(f"\n{'OK - no issues' if total == 0 else f'DONE - {len(gen_issues)} generation issue(s), {len(val_issues)} missing asset(s)'}")
 
     @classmethod
