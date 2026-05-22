@@ -674,7 +674,7 @@ class AirtestGenerator(metaclass=_GenMeta):
     def wrap_main_body(self, step_lines, suite_id):
         """Wrap the def main() body. Default: identity.
 
-        Override to inject TestCaseTimer context manager, try/except,
+        Override to inject try/except,
         snapshot-on-fail, teardown, etc.
 
         Receives a flat list of unindented lines (one statement / comment per

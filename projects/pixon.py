@@ -27,7 +27,6 @@ class PixonGenerator(AirtestGenerator):
         "from airtest.core.api import *\n"
         "from airtest.aircv import Template\n"
         "from pixon.common import wrappers as wrapper\n"
-        "from pixon.common.testcase_timer import TestCaseTimer\n"
         "from pixon.common.test_fixtures_daily import (\n"
         "    open_app_with_fake_ads, teardown_app, reset_progress, go_home_clean,\n"
         ")\n"
@@ -48,20 +47,19 @@ class PixonGenerator(AirtestGenerator):
 
     def wrap_main_body(self, step_lines, suite_id):
         out = [
-            f"with TestCaseTimer({suite_id!r}):",
-            "    try:",
+            "try:",
         ]
         if step_lines:
             for l in step_lines:
-                out.append(f"        {l}")
+                out.append(f"    {l}")
         else:
-            out.append("        pass")
+            out.append("    pass")
         out += [
-            "    except Exception as e:",
-            f"        wrapper.log_error({suite_id!r} + ' failed: ' + str(e) + chr(10) + traceback.format_exc())",
-            f"        snapshot(filename={suite_id.lower() + '_error.png'!r})",
-            "    finally:",
-            "        teardown_app()",
+            "except Exception as e:",
+            f"    wrapper.log_error({suite_id!r} + ' failed: ' + str(e) + chr(10) + traceback.format_exc())",
+            f"    snapshot(filename={suite_id.lower() + '_error.png'!r})",
+            "finally:",
+            "    teardown_app()",
         ]
         return out
 
