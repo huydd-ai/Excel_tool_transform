@@ -42,17 +42,15 @@ def _ctx(assets=None, app_package=""):
 # --------------------------------------------------------------------------- #
 
 def test_resolve_image_flags_missing_target():
-    asset, lines, issue = _resolve_image(_step("CLICK"), _ctx())
-    assert asset is None
-    assert issue.reason == "MISSING_TARGET"
-    assert "MISSING_TARGET" in lines[0]
+    from models import AirtestError
+    with pytest.raises(AirtestError, match="MISSING_TARGET"):
+        _resolve_image(_step("CLICK"), _ctx())
 
 
 def test_resolve_image_flags_unknown_target():
-    asset, lines, issue = _resolve_image(_step("CLICK", target="zzz"), _ctx())
-    assert asset is None
-    assert "UNKNOWN_TARGET" in issue.reason
-    assert "UNKNOWN_TARGET" in lines[0]
+    from models import AirtestError
+    with pytest.raises(AirtestError, match="UNKNOWN_TARGET"):
+        _resolve_image(_step("CLICK", target="zzz"), _ctx())
 
 
 def test_resolve_image_rejects_non_image_locator():
@@ -172,14 +170,14 @@ def test_read_text_remains_a_todo_stub(gen):
 # --------------------------------------------------------------------------- #
 
 def test_generator_flags_unknown_action():
-    src, issues = generate_suite_script(
-        [_step("BOGUS")],
-        _ctx(),
-        source_name="x.xlsx",
-        suite_id="S",
-    )
-    assert any("UNSUPPORTED_ACTION" in i.reason for i in issues)
-    assert "UNSUPPORTED_ACTION" in src
+    from models import AirtestError
+    with pytest.raises(AirtestError, match="UNSUPPORTED_ACTION"):
+        generate_suite_script(
+            [_step("BOGUS")],
+            _ctx(),
+            source_name="x.xlsx",
+            suite_id="S",
+        )
 
 
 def test_generator_emits_step_label_with_expected_result():

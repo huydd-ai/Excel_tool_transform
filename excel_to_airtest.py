@@ -454,6 +454,8 @@ _HINT_MAP = {
     "INVALID_SCROLL_DIRECTION": "use one of: up/down/left/right in the Params cell",
     "INVALID_SLEEP_PARAMS":     'provide seconds as a number (e.g. "2.5") or {"seconds": 2.5}',
     "READ_TEXT":                "READ_TEXT is a v2 feature — leave as TODO stub for now",
+    "SERVER_VALIDATION":        "server-side rule — requires manual verification or backend integration",
+    "MANUAL_TIMER_CHECK":       "long timer — skip in automation, verify manually",
 }
 
 
@@ -508,15 +510,18 @@ class AirtestGenerator(metaclass=_GenMeta):
     def _todo(self, step: Step, reason: str):
         return [f"# TODO: {reason}"], self._issue(step, reason)
 
+    def inject_config(self, cfg: dict) -> list[str]:
+        """Convert a configuration dict into an injected code string."""
+        return [f"# config: {cfg}"]
+
     def _resolve_image(self, step: Step, ctx: GenCtx):
-        """Return (Asset, None, None) on success or (None, lines, issue) on failure."""
+        """Return (Asset, None, None) on success or raise AirtestError on missing/unknown targets to prevent hallucination."""
+        from models import AirtestError
         if not step.target:
-            l, i = self._todo(step, "MISSING_TARGET")
-            return None, l, i
+            raise AirtestError(f"MISSING_TARGET: target is missing for step {step.step_no} in suite {step.suite_id}")
         asset = ctx.assets.get(step.target)
         if asset is None:
-            l, i = self._todo(step, f"UNKNOWN_TARGET '{step.target}'")
-            return None, l, i
+            raise AirtestError(f"UNKNOWN_TARGET '{step.target}' in suite {step.suite_id}")
         if asset.locator_type != LOCATOR_IMAGE:
             l, i = self._todo(step, f"UNSUPPORTED_LOCATOR '{asset.locator_type}' for '{step.target}'")
             return None, l, i
@@ -570,7 +575,7 @@ class AirtestGenerator(metaclass=_GenMeta):
         if step.params:
             try:
                 cfg = json.loads(step.params)
-                out.append(f"# config: {cfg!r}")
+                out.extend(self.inject_config(cfg))
             except json.JSONDecodeError:
                 return [f"# TODO: INVALID_PARAMS_JSON: {step.params!r}"], self._issue(step, "INVALID_PARAMS_JSON")
         if not ctx.app_package:
@@ -666,7 +671,8 @@ class AirtestGenerator(metaclass=_GenMeta):
         label = self.step_label(step)
         handler = self._HANDLERS.get(step.action)
         if handler is None:
-            return [label, f"# UNSUPPORTED_ACTION: {step.action!r}"], self._issue(step, f"UNSUPPORTED_ACTION '{step.action}'")
+            from models import AirtestError
+            raise AirtestError(f"UNSUPPORTED_ACTION '{step.action}' in suite {step.suite_id}")
         lines, issue = handler(self, step, ctx)
         body = [l for l in lines if l]
         return [label] + body, issue
