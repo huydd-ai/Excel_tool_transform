@@ -103,10 +103,10 @@ def test_long_press_generates_long_click():
 
 
 def test_long_press_missing_target_returns_todo():
+    from models import AirtestError
     gen = AirtestGenerator()
-    lines, issue = gen._HANDLERS["LONG_PRESS"](gen, _step("LONG_PRESS", target=""), _ctx())
-    assert issue is not None
-    assert "MISSING_TARGET" in issue.reason
+    with pytest.raises(AirtestError, match="MISSING_TARGET"):
+        gen._HANDLERS["LONG_PRESS"](gen, _step("LONG_PRESS", target=""), _ctx())
 
 
 # --- SLEEP ---

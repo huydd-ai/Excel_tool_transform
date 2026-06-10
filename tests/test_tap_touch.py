@@ -59,18 +59,18 @@ def test_click_output_contains_deprecated_comment():
 
 
 def test_tap_missing_target_returns_todo():
+    from models import AirtestError
     gen = AirtestGenerator()
     step = Step(suite_id="S", step_no=1, action="TAP", excel_row=2,
                 target="", params="", expected="")
-    lines, issue = gen._HANDLERS["TAP"](gen, step, _ctx())
-    assert issue is not None
-    assert "MISSING_TARGET" in issue.reason
+    with pytest.raises(AirtestError, match="MISSING_TARGET"):
+        gen._HANDLERS["TAP"](gen, step, _ctx())
 
 
 def test_touch_missing_target_returns_todo():
+    from models import AirtestError
     gen = AirtestGenerator()
     step = Step(suite_id="S", step_no=1, action="TOUCH", excel_row=2,
                 target="", params="", expected="")
-    lines, issue = gen._HANDLERS["TOUCH"](gen, step, _ctx())
-    assert issue is not None
-    assert "MISSING_TARGET" in issue.reason
+    with pytest.raises(AirtestError, match="MISSING_TARGET"):
+        gen._HANDLERS["TOUCH"](gen, step, _ctx())
