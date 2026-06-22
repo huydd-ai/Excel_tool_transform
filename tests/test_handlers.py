@@ -247,31 +247,13 @@ def test_repr_blocks_injection_via_input_text_params(gen):
     assert node.args[0].value == nasty
 
 
-def test_step_label_strips_newlines_from_expected():
+@pytest.mark.parametrize("eol", ["\n", "\r", "\r\n"])
+def test_step_label_strips_newlines_from_expected(eol):
     """Newline in expected must not escape the Python comment."""
     gen = AirtestGenerator()
-    # \n payload
-    step = Step(
-        suite_id="S1",
-        step_no=1,
-        action="SLEEP",
-        expected='ok\nimport os; os.system("evil")',
-    )
+    step = Step(suite_id="S1", step_no=1, action="SLEEP",
+                expected=f'ok{eol}import os; os.system("evil")')
     label = gen.step_label(step)
     assert "\n" not in label
+    assert "\r" not in label
     assert "import os" not in label
-
-    # \r payload
-    step_cr = Step(suite_id="S1", step_no=1, action="SLEEP",
-                   expected='ok\rimport os; os.system("evil")')
-    label_cr = gen.step_label(step_cr)
-    assert "\r" not in label_cr
-    assert "import os" not in label_cr
-
-    # \r\n payload
-    step_crlf = Step(suite_id="S1", step_no=1, action="SLEEP",
-                     expected='ok\r\nimport os; os.system("evil")')
-    label_crlf = gen.step_label(step_crlf)
-    assert "\r" not in label_crlf
-    assert "\n" not in label_crlf
-    assert "import os" not in label_crlf
