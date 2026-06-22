@@ -1,9 +1,14 @@
 """
 rules_to_suites.py — Convert Manual_Testing_Guidelines_Rules.xlsx into .air scripts.
 
-Reads the rules-based Excel schema (General Guidelines, Feature Rules, Edge Cases,
-Release Checklist) and maps each rule/check to a test suite using the existing
+Maps each rule/check from the rules document to a test suite using the existing
 AirtestGenerator pipeline.
+
+Parsing is delegated to rules_parser.py; this module owns only:
+  - Suite definition (SuiteDef)
+  - Step builders
+  - Rule → suite mapping (FEATURE_RULE_MAP, EDGE_CASE_MAP, CHECKLIST_MAP)
+  - resolve_suites(), generate_all(), and the CLI
 
 Usage:
     python rules_to_suites.py Manual_Testing_Guidelines_Rules.xlsx --project pixon
@@ -16,11 +21,6 @@ import os
 import sys
 from dataclasses import dataclass, field
 
-try:
-    import openpyxl
-except ImportError:
-    sys.exit("ERROR: openpyxl not installed. Run: pip install openpyxl")
-
 from excel_to_airtest import (
     AirtestGenerator,
     Asset,
@@ -30,124 +30,13 @@ from excel_to_airtest import (
     _PROJECT_REGISTRY,
 )
 from models import AirtestError
-from parsers import _str
-
-# --------------------------------------------------------------------------- #
-# Data models for the rules document                                          #
-# --------------------------------------------------------------------------- #
-
-
-@dataclass
-class FeatureRule:
-    feature: str
-    logic_item: str
-    condition: str
-    expected: str
-
-
-@dataclass
-class EdgeCase:
-    edge_id: str
-    scenario: str
-    condition: str
-    recovery: str
-
-
-@dataclass
-class ChecklistItem:
-    check_id: str
-    description: str
-
-
-@dataclass
-class RulesDoc:
-    guidelines: list = field(default_factory=list)
-    feature_rules: list = field(default_factory=list)
-    edge_cases: list = field(default_factory=list)
-    checklist: list = field(default_factory=list)
-
-
-# --------------------------------------------------------------------------- #
-# Parser: read the manual-testing-guidelines Excel                            #
-# --------------------------------------------------------------------------- #
-
-
-def _header_index(ws) -> dict[str, int]:
-    """Map normalised (lowercased, stripped) header text -> column index."""
-    hdr = next(ws.iter_rows(min_row=1, max_row=1, values_only=True), None)
-    if hdr is None:
-        return {}
-    return {_str(h).lower(): i for i, h in enumerate(hdr) if not _blank_cell(h)}
-
-
-def _blank_cell(val) -> bool:
-    return val is None or (isinstance(val, str) and not val.strip())
-
-
-def _col(row: tuple, idx: int | None, fallback: int) -> str:
-    """Read a cell by header index, falling back to a fixed position.
-
-    Header-mapping wins when the column is present (robust to reorder);
-    positional fallback keeps working when header text drifts.
-    """
-    i = idx if idx is not None else fallback
-    return _str(row[i]) if 0 <= i < len(row) else ""
-
-
-def read_rules_excel(path: str) -> RulesDoc:
-    wb = openpyxl.load_workbook(path, data_only=True)
-    doc = RulesDoc()
-
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        hdr = _header_index(ws)
-        rows = list(ws.iter_rows(min_row=2, values_only=True))
-        if not rows:
-            continue
-
-        if sheet_name == "General Guidelines":
-            doc.guidelines = [
-                (r[0], r[1], r[2]) for r in rows if any(c is not None for c in r)
-            ]
-
-        elif sheet_name == "Feature Rules":
-            for r in rows:
-                if not any(c is not None for c in r):
-                    continue
-                doc.feature_rules.append(
-                    FeatureRule(
-                        feature=_col(r, hdr.get("feature"), 0),
-                        logic_item=_col(r, hdr.get("logic item"), 1),
-                        condition=_col(r, hdr.get("rule / condition"), 2),
-                        expected=_col(r, hdr.get("expected behavior"), 3),
-                    )
-                )
-
-        elif sheet_name == "Edge Cases":
-            for r in rows:
-                if not any(c is not None for c in r):
-                    continue
-                doc.edge_cases.append(
-                    EdgeCase(
-                        edge_id=_col(r, hdr.get("id"), 0),
-                        scenario=_col(r, hdr.get("scenario"), 1),
-                        condition=_col(r, hdr.get("condition"), 2),
-                        recovery=_col(r, hdr.get("required handling (recovery)"), 3),
-                    )
-                )
-
-        elif sheet_name == "Release Checklist":
-            for r in rows:
-                if not any(c is not None for c in r):
-                    continue
-                doc.checklist.append(
-                    ChecklistItem(
-                        check_id=_col(r, hdr.get("check id"), 0),
-                        description=_col(r, hdr.get("verify item"), 1),
-                    )
-                )
-
-    return doc
+from rules_parser import (
+    FeatureRule,
+    EdgeCase,
+    ChecklistItem,
+    RulesDoc,
+    read_rules_excel,
+)
 
 
 # --------------------------------------------------------------------------- #
