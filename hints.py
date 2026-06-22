@@ -64,6 +64,24 @@ Add version-keyed overrides here::
 
 _QUOTED_NAME_RE = re.compile(r"'([^']*)'")
 
+_COLUMN_DESCRIPTIONS: dict[str, str] = {
+    "object_id": "unique identifier for a UI element",
+    "locator_type": "how to find the element (IMAGE or OCR)",
+    "resource_path": "filesystem path to the image template",
+    "smart_threshold": "image-matching confidence threshold (0.0–1.0)",
+    "timeout": "max wait time in seconds before giving up",
+    "suite_id": "test-case identifier (one .air script per suite)",
+    "step": "ordinal step number within the suite",
+    "action_keyword": "action to perform (TOUCH, WAIT_FOR, …)",
+    "target_id": "Object_ID from Object_Repository",
+    "params": "JSON or plain-text parameters for the action",
+    "expected_result": "what the test expects after this step",
+    "logic_id": "identifier for an Action_Logic row (ACT_* / FLOW_*)",
+    "action_name": "display name for the action/flow",
+    "machine_command": "canonical keyword this row documents",
+    "target_page": "associated page-object (informational)",
+}
+
 # ── Query Functions ───────────────────────────────────────────────────────────
 
 
@@ -104,27 +122,6 @@ def get_hints_for_version(version: str) -> dict[str, str]:
 
 
 def explain_column(col_name: str) -> str:
-    """Return a short human-readable description of an Excel column name.
-
-    Handles normalised (lowercase, underscored) column names as they appear
-    after header processing.
-    """
-    _COLUMN_DESCRIPTIONS: dict[str, str] = {
-        "object_id": "unique identifier for a UI element",
-        "locator_type": "how to find the element (IMAGE or OCR)",
-        "resource_path": "filesystem path to the image template",
-        "smart_threshold": "image-matching confidence threshold (0.0–1.0)",
-        "timeout": "max wait time in seconds before giving up",
-        "suite_id": "test-case identifier (one .air script per suite)",
-        "step": "ordinal step number within the suite",
-        "action_keyword": "action to perform (TOUCH, WAIT_FOR, …)",
-        "target_id": "Object_ID from Object_Repository",
-        "params": "JSON or plain-text parameters for the action",
-        "expected_result": "what the test expects after this step",
-        "logic_id": "identifier for an Action_Logic row (ACT_* / FLOW_*)",
-        "action_name": "display name for the action/flow",
-        "machine_command": "canonical keyword this row documents",
-        "target_page": "associated page-object (informational)",
-    }
+    """Return a short human-readable description of an Excel column name."""
     key = col_name.strip().lower().replace(" ", "_")
     return _COLUMN_DESCRIPTIONS.get(key, f"column '{col_name}'")
