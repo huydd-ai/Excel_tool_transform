@@ -16,6 +16,8 @@ Functions:
 
 from __future__ import annotations
 
+import re
+
 # ── Hint Map ──────────────────────────────────────────────────────────────────
 
 HINT_MAP: dict[str, str] = {
@@ -60,6 +62,7 @@ Add version-keyed overrides here::
     }
 """
 
+_QUOTED_NAME_RE = re.compile(r"'([^']*)'")
 
 # ── Query Functions ───────────────────────────────────────────────────────────
 
@@ -75,14 +78,16 @@ def diagnostic_hint(reason: str) -> str:
         if key in reason:
             return hint
     if "UNKNOWN_TARGET" in reason:
-        target = reason.split("'")[1] if "'" in reason else reason
+        m = _QUOTED_NAME_RE.search(reason)
+        target = m.group(1) if m else reason
         return f"add row with Object_ID='{target}' to Object_Repository sheet"
     if "UNSUPPORTED_LOCATOR" in reason:
         return (
             "OCR locators are v2 — change Locator_Type to IMAGE or leave as TODO stub"
         )
     if "MISSING_RESOURCE_PATH" in reason:
-        target = reason.split("'")[1] if "'" in reason else ""
+        m = _QUOTED_NAME_RE.search(reason)
+        target = m.group(1) if m else ""
         return f"fill Resource_Path for '{target}' in Object_Repository sheet"
     return "check the Excel cell for this step"
 

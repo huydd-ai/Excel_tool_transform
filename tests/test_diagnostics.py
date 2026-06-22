@@ -34,3 +34,20 @@ def test_hint_unknown_reason_returns_generic():
     hint = _diagnostic_hint("TOTALLY_UNKNOWN_ERROR_XYZ")
     assert len(hint) > 0
     assert "check" in hint.lower() or "excel" in hint.lower()
+
+
+def test_hint_unknown_target_with_no_quotes():
+    """reason with no quotes should not crash — returns safe fallback."""
+    hint = _diagnostic_hint("UNKNOWN_TARGET noquotes")
+    assert "Object_Repository" in hint
+
+
+def test_hint_unknown_target_with_multiple_quoted_names():
+    """First quoted name is extracted correctly when multiple exist."""
+    hint = _diagnostic_hint("UNKNOWN_TARGET 'btn_a' in 'suite_x'")
+    assert "btn_a" in hint
+
+
+def test_hint_missing_resource_path_with_no_quotes():
+    hint = _diagnostic_hint("MISSING_RESOURCE_PATH for noquotes")
+    assert "Resource_Path" in hint
