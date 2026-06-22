@@ -107,6 +107,15 @@ _PROJECT_REGISTRY: dict[str, type] = {}
 """Global mapping: normalised project name → generator *class*."""
 
 
+def list_projects() -> None:
+    """Print all registered project names to stdout."""
+    if not _PROJECT_REGISTRY:
+        print("No projects registered.")
+        return
+    for name in sorted(_PROJECT_REGISTRY):
+        print(f"  {name}  →  {_PROJECT_REGISTRY[name].__name__}")
+
+
 def register_project(name: str) -> Callable:
     """Decorator: register a generator subclass under a project name.
 

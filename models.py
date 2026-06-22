@@ -140,18 +140,8 @@ class GenCtx:
 # ── New Canonical Names ───────────────────────────────────────────────────────
 
 
-@dataclass
-class AirtestStep:
-    """A single generated line of Airtest source code.
-
-    Captures the code string together with its indentation level and an
-    optional trailing comment for readability in the generated .air file.
-    """
-
-    code: str
-    indent: int = 0
-    comment: str | None = None
-
+HandlerResult = tuple[list[str], GenerationIssue | None]
+"""Return type for all @action handler methods: (code_lines, issue_or_None)."""
 
 # Backward-compatible aliases
 ParsedAction = Step
