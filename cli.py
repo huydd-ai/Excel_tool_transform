@@ -196,34 +196,36 @@ def exec_cli(gen: object, args: argparse.Namespace) -> None:
     os.makedirs(plan_dir, exist_ok=True)
 
     wb = openpyxl.load_workbook(args.excel_file, data_only=True)
+    try:
+        print(f"[parse] {args.objects_sheet}...")
+        assets, obj_errors = parse_object_repository(wb, args.objects_sheet)
+        for e in obj_errors:
+            print(f"  [ERROR] {e}")
+        if obj_errors:
+            sys.exit(1)
+        print(f"        {len(assets)} objects loaded")
 
-    print(f"[parse] {args.objects_sheet}...")
-    assets, obj_errors = parse_object_repository(wb, args.objects_sheet)
-    for e in obj_errors:
-        print(f"  [ERROR] {e}")
-    if obj_errors:
-        sys.exit(1)
-    print(f"        {len(assets)} objects loaded")
+        print(f"[parse] {args.actions_sheet}...")
+        keywords, flows, act_errors = parse_action_logic(wb, args.actions_sheet)
+        for e in act_errors:
+            print(f"  [ERROR] {e}")
+        print(f"        {len(keywords)} action keywords, {len(flows)} flow descriptions")
 
-    print(f"[parse] {args.actions_sheet}...")
-    keywords, flows, act_errors = parse_action_logic(wb, args.actions_sheet)
-    for e in act_errors:
-        print(f"  [ERROR] {e}")
-    print(f"        {len(keywords)} action keywords, {len(flows)} flow descriptions")
+        print("[validate] Asset paths on disk...")
+        val_issues = validate_assets(assets, base_dir)
+        print(f"           {len(val_issues)} missing file(s)")
 
-    print("[validate] Asset paths on disk...")
-    val_issues = validate_assets(assets, base_dir)
-    print(f"           {len(val_issues)} missing file(s)")
-
-    print(f"[parse] {args.steps_sheet}...")
-    suites, step_errors = parse_test_execution(wb, args.steps_sheet)
-    for e in step_errors:
-        print(f"  [ERROR] {e}")
-    if step_errors:
-        sys.exit(1)
-    print(
-        f"        {len(suites)} suite(s), {sum(len(v) for v in suites.values())} step(s)"
-    )
+        print(f"[parse] {args.steps_sheet}...")
+        suites, step_errors = parse_test_execution(wb, args.steps_sheet)
+        for e in step_errors:
+            print(f"  [ERROR] {e}")
+        if step_errors:
+            sys.exit(1)
+        print(
+            f"        {len(suites)} suite(s), {sum(len(v) for v in suites.values())} step(s)"
+        )
+    finally:
+        wb.close()
 
     ctx = GenCtx(assets=assets, app_package=args.app_package)
     source_name = os.path.basename(args.excel_file)

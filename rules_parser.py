@@ -94,54 +94,55 @@ def read_rules_excel(path: str) -> RulesDoc:
     """Parse Manual_Testing_Guidelines_Rules.xlsx into a RulesDoc."""
     wb = openpyxl.load_workbook(path, data_only=True)
     doc = RulesDoc()
+    try:
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            hdr = _header_index(ws)
+            rows = list(ws.iter_rows(min_row=2, values_only=True))
+            if not rows:
+                continue
 
-    for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        hdr = _header_index(ws)
-        rows = list(ws.iter_rows(min_row=2, values_only=True))
-        if not rows:
-            continue
+            if sheet_name == "General Guidelines":
+                doc.guidelines = [
+                    (r[0], r[1], r[2]) for r in rows if any(c is not None for c in r)
+                ]
 
-        if sheet_name == "General Guidelines":
-            doc.guidelines = [
-                (r[0], r[1], r[2]) for r in rows if any(c is not None for c in r)
-            ]
-
-        elif sheet_name == "Feature Rules":
-            for r in rows:
-                if not any(c is not None for c in r):
-                    continue
-                doc.feature_rules.append(
-                    FeatureRule(
-                        feature=_col(r, hdr.get("feature"), 0),
-                        logic_item=_col(r, hdr.get("logic item"), 1),
-                        condition=_col(r, hdr.get("rule / condition"), 2),
-                        expected=_col(r, hdr.get("expected behavior"), 3),
+            elif sheet_name == "Feature Rules":
+                for r in rows:
+                    if not any(c is not None for c in r):
+                        continue
+                    doc.feature_rules.append(
+                        FeatureRule(
+                            feature=_col(r, hdr.get("feature"), 0),
+                            logic_item=_col(r, hdr.get("logic item"), 1),
+                            condition=_col(r, hdr.get("rule / condition"), 2),
+                            expected=_col(r, hdr.get("expected behavior"), 3),
+                        )
                     )
-                )
 
-        elif sheet_name == "Edge Cases":
-            for r in rows:
-                if not any(c is not None for c in r):
-                    continue
-                doc.edge_cases.append(
-                    EdgeCase(
-                        edge_id=_col(r, hdr.get("id"), 0),
-                        scenario=_col(r, hdr.get("scenario"), 1),
-                        condition=_col(r, hdr.get("condition"), 2),
-                        recovery=_col(r, hdr.get("required handling (recovery)"), 3),
+            elif sheet_name == "Edge Cases":
+                for r in rows:
+                    if not any(c is not None for c in r):
+                        continue
+                    doc.edge_cases.append(
+                        EdgeCase(
+                            edge_id=_col(r, hdr.get("id"), 0),
+                            scenario=_col(r, hdr.get("scenario"), 1),
+                            condition=_col(r, hdr.get("condition"), 2),
+                            recovery=_col(r, hdr.get("required handling (recovery)"), 3),
+                        )
                     )
-                )
 
-        elif sheet_name == "Release Checklist":
-            for r in rows:
-                if not any(c is not None for c in r):
-                    continue
-                doc.checklist.append(
-                    ChecklistItem(
-                        check_id=_col(r, hdr.get("check id"), 0),
-                        description=_col(r, hdr.get("verify item"), 1),
+            elif sheet_name == "Release Checklist":
+                for r in rows:
+                    if not any(c is not None for c in r):
+                        continue
+                    doc.checklist.append(
+                        ChecklistItem(
+                            check_id=_col(r, hdr.get("check id"), 0),
+                            description=_col(r, hdr.get("verify item"), 1),
+                        )
                     )
-                )
-
+    finally:
+        wb.close()
     return doc

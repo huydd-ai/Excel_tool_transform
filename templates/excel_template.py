@@ -49,6 +49,7 @@ def generate_template(output_path: str = "template.xlsx") -> str:
     _write_test_execution(ws_test)
 
     wb.save(output_path)
+    wb.close()
     return os.path.abspath(output_path)
 
 
