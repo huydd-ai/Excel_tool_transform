@@ -245,3 +245,17 @@ def test_repr_blocks_injection_via_input_text_params(gen):
     assert isinstance(node, ast.Call) and node.func.id == "text"
     assert isinstance(node.args[0], ast.Constant)
     assert node.args[0].value == nasty
+
+
+def test_step_label_strips_newlines_from_expected(make_wb):
+    """Newline in expected must not escape the Python comment."""
+    gen = AirtestGenerator()
+    step = Step(
+        suite_id="S1",
+        step_no=1,
+        action="SLEEP",
+        expected='ok\nimport os; os.system("evil")',
+    )
+    label = gen.step_label(step)
+    assert "\n" not in label
+    assert "import os" not in label

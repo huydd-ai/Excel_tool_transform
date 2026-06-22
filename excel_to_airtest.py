@@ -231,9 +231,10 @@ class AirtestGenerator(metaclass=_GenMeta):
     # Generation methods
     # ------------------------------------------------------------------- #
     def step_label(self, step: Step) -> str:
-        return f"# step {step.step_no}" + (
-            f" - {step.expected}" if step.expected else ""
-        )
+        if step.expected:
+            safe = step.expected.replace("\r", "\n").split("\n", 1)[0]
+            return f"# step {step.step_no} - {safe}"
+        return f"# step {step.step_no}"
 
     def _generate_step(self, step: Step, ctx: GenCtx) -> HandlerResult:
         label = self.step_label(step)
