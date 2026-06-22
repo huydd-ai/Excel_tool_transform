@@ -4,6 +4,7 @@ Handlers are methods on AirtestGenerator. The module-level `_HANDLERS` dict
 holds the unbound functions; tests invoke them by passing a generator instance
 as the first argument: `_HANDLERS["CLICK"](gen, step, ctx)`.
 """
+
 import ast
 
 import pytest
@@ -28,8 +29,13 @@ def gen():
 
 def _step(action, target="", params="", suite="S", step_no=1, row=2, expected=""):
     return Step(
-        suite_id=suite, step_no=step_no, action=action, excel_row=row,
-        target=target, params=params, expected=expected,
+        suite_id=suite,
+        step_no=step_no,
+        action=action,
+        excel_row=row,
+        target=target,
+        params=params,
+        expected=expected,
     )
 
 
@@ -41,14 +47,17 @@ def _ctx(assets=None, app_package=""):
 # _resolve_image branches                                                     #
 # --------------------------------------------------------------------------- #
 
+
 def test_resolve_image_flags_missing_target():
     from models import AirtestError
+
     with pytest.raises(AirtestError, match="MISSING_TARGET"):
         _resolve_image(_step("CLICK"), _ctx())
 
 
 def test_resolve_image_flags_unknown_target():
     from models import AirtestError
+
     with pytest.raises(AirtestError, match="UNKNOWN_TARGET"):
         _resolve_image(_step("CLICK", target="zzz"), _ctx())
 
@@ -87,6 +96,7 @@ def test_resolve_image_succeeds_on_valid_image_asset():
 # CLICK / WAIT_FOR / ASSERT_VISIBLE                                           #
 # --------------------------------------------------------------------------- #
 
+
 def test_click_emits_touch_with_threshold(gen):
     assets = {"b": Asset("b", resource_path="b.png", threshold=0.9)}
     lines, issue = _HANDLERS["CLICK"](gen, _step("CLICK", target="b"), _ctx(assets))
@@ -98,7 +108,9 @@ def test_click_emits_touch_with_threshold(gen):
 
 def test_wait_for_uses_per_object_timeout(gen):
     assets = {"b": Asset("b", resource_path="b.png", threshold=0.8, timeout=12)}
-    lines, issue = _HANDLERS["WAIT_FOR"](gen, _step("WAIT_FOR", target="b"), _ctx(assets))
+    lines, issue = _HANDLERS["WAIT_FOR"](
+        gen, _step("WAIT_FOR", target="b"), _ctx(assets)
+    )
     assert issue is None
     assert lines[0].startswith("wait(Template(")
     assert "timeout=12" in lines[0]
@@ -106,7 +118,9 @@ def test_wait_for_uses_per_object_timeout(gen):
 
 def test_assert_visible_uses_per_object_timeout(gen):
     assets = {"b": Asset("b", resource_path="b.png", timeout=8)}
-    lines, issue = _HANDLERS["ASSERT_VISIBLE"](gen, _step("ASSERT_VISIBLE", target="b"), _ctx(assets))
+    lines, issue = _HANDLERS["ASSERT_VISIBLE"](
+        gen, _step("ASSERT_VISIBLE", target="b"), _ctx(assets)
+    )
     assert issue is None
     assert lines[0].startswith("assert_exists(Template(")
     assert "timeout=8" in lines[0]
@@ -116,6 +130,7 @@ def test_assert_visible_uses_per_object_timeout(gen):
 # START_APP                                                                   #
 # --------------------------------------------------------------------------- #
 
+
 def test_start_app_flags_missing_package(gen):
     lines, issue = _HANDLERS["START_APP"](gen, _step("START_APP"), _ctx())
     assert issue.reason == "START_APP_NEEDS_PACKAGE"
@@ -123,7 +138,9 @@ def test_start_app_flags_missing_package(gen):
 
 
 def test_start_app_emits_start_app_call_with_package(gen):
-    lines, issue = _HANDLERS["START_APP"](gen, _step("START_APP"), _ctx(app_package="com.x.y"))
+    lines, issue = _HANDLERS["START_APP"](
+        gen, _step("START_APP"), _ctx(app_package="com.x.y")
+    )
     assert issue is None
     assert "start_app('com.x.y')" in lines
 
@@ -153,8 +170,11 @@ def test_start_app_flags_invalid_json_params(gen):
 # INPUT_TEXT / READ_TEXT                                                      #
 # --------------------------------------------------------------------------- #
 
+
 def test_input_text_passes_params_through_repr(gen):
-    lines, issue = _HANDLERS["INPUT_TEXT"](gen, _step("INPUT_TEXT", params="hello"), _ctx())
+    lines, issue = _HANDLERS["INPUT_TEXT"](
+        gen, _step("INPUT_TEXT", params="hello"), _ctx()
+    )
     assert issue is None
     assert lines == ["text('hello')"]
 
@@ -169,8 +189,10 @@ def test_read_text_remains_a_todo_stub(gen):
 # Generator dispatch                                                          #
 # --------------------------------------------------------------------------- #
 
+
 def test_generator_flags_unknown_action():
     from models import AirtestError
+
     with pytest.raises(AirtestError, match="UNSUPPORTED_ACTION"):
         generate_suite_script(
             [_step("BOGUS")],
@@ -195,6 +217,7 @@ def test_generator_emits_step_label_with_expected_result():
 # --------------------------------------------------------------------------- #
 # Injection guard via repr()                                                  #
 # --------------------------------------------------------------------------- #
+
 
 def test_repr_blocks_injection_via_resource_path(gen):
     nasty = 'x"); import os; os.system("calc"); Template(r"'

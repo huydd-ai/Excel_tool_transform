@@ -79,8 +79,7 @@ def diagnostic_hint(reason: str) -> str:
         return f"add row with Object_ID='{target}' to Object_Repository sheet"
     if "UNSUPPORTED_LOCATOR" in reason:
         return (
-            "OCR locators are v2 — change Locator_Type to IMAGE "
-            "or leave as TODO stub"
+            "OCR locators are v2 — change Locator_Type to IMAGE or leave as TODO stub"
         )
     if "MISSING_RESOURCE_PATH" in reason:
         target = reason.split("'")[1] if "'" in reason else ""

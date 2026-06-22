@@ -235,5 +235,4 @@ def validate_assets(assets: dict[str, Asset], base_dir: str) -> list[ValidationI
         full = path if os.path.isabs(path) else os.path.join(base_dir, path)
         if not os.path.isfile(full):
             issues.append(ValidationIssue(component=name, path=path))
-            print(f"  [WARN] Asset not found on disk: {path}  (object: {name})")
     return issues

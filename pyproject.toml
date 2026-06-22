@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "excel-tool"
+version = "0.1.0"
+description = "Convert AutomationRebase Excel workbooks to Airtest .air scripts"
+requires-python = ">=3.10"
+dependencies = ["openpyxl>=3.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+excel-tool = "excel_to_airtest:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
