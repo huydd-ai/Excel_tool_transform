@@ -1,24 +1,27 @@
 """Parsers: Object_Repository / Test_Execution / Action_Logic."""
+
 import openpyxl
 
-from excel_to_airtest import (
-    LOCATOR_IMAGE,
-    LOCATOR_OCR,
+from parsers import (
     parse_action_logic,
     parse_object_repository,
     parse_test_execution,
 )
+from models import LOCATOR_IMAGE, LOCATOR_OCR
 
 
 # --------------------------------------------------------------------------- #
 # Object_Repository                                                           #
 # --------------------------------------------------------------------------- #
 
+
 def test_object_repo_loads_assets_with_typed_fields(make_wb_file):
-    p = make_wb_file(objects=[
-        ["btn_play",  "IMAGE", "./assets/btn.png", 0.85, 3],
-        ["heart_txt", "OCR",   "NONE",             0.7,  10],
-    ])
+    p = make_wb_file(
+        objects=[
+            ["btn_play", "IMAGE", "./assets/btn.png", 0.85, 3],
+            ["heart_txt", "OCR", "NONE", 0.7, 10],
+        ]
+    )
     wb = openpyxl.load_workbook(p, data_only=True)
     assets, errs = parse_object_repository(wb, "Object_Repository")
 
@@ -43,12 +46,14 @@ def test_object_repo_applies_defaults_for_missing_fields(make_wb_file):
 
 
 def test_object_repo_skips_blank_rows_and_empty_ids(make_wb_file):
-    p = make_wb_file(objects=[
-        ["a",  "IMAGE", "x.png", 0.8, 1],
-        [None, None,    None,    None, None],
-        ["",   "IMAGE", "y.png", 0.8, 1],
-        ["b",  "IMAGE", "z.png", 0.8, 1],
-    ])
+    p = make_wb_file(
+        objects=[
+            ["a", "IMAGE", "x.png", 0.8, 1],
+            [None, None, None, None, None],
+            ["", "IMAGE", "y.png", 0.8, 1],
+            ["b", "IMAGE", "z.png", 0.8, 1],
+        ]
+    )
     wb = openpyxl.load_workbook(p, data_only=True)
     assets, _ = parse_object_repository(wb, "Object_Repository")
     assert set(assets) == {"a", "b"}
@@ -74,7 +79,13 @@ def test_object_repo_returns_error_when_required_column_missing(make_wb_file):
 def test_object_repo_headers_are_case_insensitive(make_wb_file):
     p = make_wb_file(
         objects=[["x", "IMAGE", "a.png", 0.9, 7]],
-        obj_headers=["object_ID", "LOCATOR_type", "Resource_Path", "smart_THRESHOLD", "TIMEOUT"],
+        obj_headers=[
+            "object_ID",
+            "LOCATOR_type",
+            "Resource_Path",
+            "smart_THRESHOLD",
+            "TIMEOUT",
+        ],
     )
     wb = openpyxl.load_workbook(p, data_only=True)
     assets, errs = parse_object_repository(wb, "Object_Repository")
@@ -88,12 +99,15 @@ def test_object_repo_headers_are_case_insensitive(make_wb_file):
 # Test_Execution                                                              #
 # --------------------------------------------------------------------------- #
 
+
 def test_test_execution_groups_by_suite(make_wb_file):
-    p = make_wb_file(steps=[
-        ["S1", 1, "CLICK",    "a", "", "ok"],
-        ["S1", 2, "WAIT_FOR", "b", "", "ok"],
-        ["S2", 1, "CLICK",    "c", "", "ok"],
-    ])
+    p = make_wb_file(
+        steps=[
+            ["S1", 1, "CLICK", "a", "", "ok"],
+            ["S1", 2, "WAIT_FOR", "b", "", "ok"],
+            ["S2", 1, "CLICK", "c", "", "ok"],
+        ]
+    )
     wb = openpyxl.load_workbook(p, data_only=True)
     suites, errs = parse_test_execution(wb, "Test_Execution")
 
@@ -104,11 +118,13 @@ def test_test_execution_groups_by_suite(make_wb_file):
 
 
 def test_test_execution_tracks_excel_row_starting_at_2(make_wb_file):
-    p = make_wb_file(steps=[
-        ["S1", 1, "CLICK",    "a", "", ""],
-        ["S1", 2, "WAIT_FOR", "b", "", ""],
-        ["S2", 1, "CLICK",    "c", "", ""],
-    ])
+    p = make_wb_file(
+        steps=[
+            ["S1", 1, "CLICK", "a", "", ""],
+            ["S1", 2, "WAIT_FOR", "b", "", ""],
+            ["S2", 1, "CLICK", "c", "", ""],
+        ]
+    )
     wb = openpyxl.load_workbook(p, data_only=True)
     suites, _ = parse_test_execution(wb, "Test_Execution")
 
@@ -126,12 +142,14 @@ def test_test_execution_uppercases_action_keyword(make_wb_file):
 
 
 def test_test_execution_skips_blank_and_suiteless_rows(make_wb_file):
-    p = make_wb_file(steps=[
-        ["S1", 1, "CLICK", "a", "", ""],
-        [None, None, None, None, None, None],
-        ["",   2, "CLICK", "b", "", ""],
-        ["S1", 3, "CLICK", "c", "", ""],
-    ])
+    p = make_wb_file(
+        steps=[
+            ["S1", 1, "CLICK", "a", "", ""],
+            [None, None, None, None, None, None],
+            ["", 2, "CLICK", "b", "", ""],
+            ["S1", 3, "CLICK", "c", "", ""],
+        ]
+    )
     wb = openpyxl.load_workbook(p, data_only=True)
     suites, _ = parse_test_execution(wb, "Test_Execution")
 
@@ -153,12 +171,15 @@ def test_test_execution_returns_error_when_required_column_missing(make_wb_file)
 # Action_Logic                                                                #
 # --------------------------------------------------------------------------- #
 
+
 def test_action_logic_splits_act_primitives_and_flow_docs(make_wb_file):
-    p = make_wb_file(actions=[
-        ["ACT_001",  "CLICK",          "CLICK(Object_ID)",    ""],
-        ["ACT_002",  "wait_for",       "WAIT_FOR(Object_ID)", ""],
-        ["FLOW_001", "Display Splash", "narrative",           "SplashScreen"],
-    ])
+    p = make_wb_file(
+        actions=[
+            ["ACT_001", "CLICK", "CLICK(Object_ID)", ""],
+            ["ACT_002", "wait_for", "WAIT_FOR(Object_ID)", ""],
+            ["FLOW_001", "Display Splash", "narrative", "SplashScreen"],
+        ]
+    )
     wb = openpyxl.load_workbook(p, data_only=True)
     kws, flows, errs = parse_action_logic(wb, "Action_Logic")
 

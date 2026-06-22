@@ -7,7 +7,8 @@ import sys
 import openpyxl
 import pytest
 
-from excel_to_airtest import AirtestGenerator, GenCtx, Step, _HANDLERS
+from excel_to_airtest import AirtestGenerator, _HANDLERS
+from models import GenCtx, Step
 from rules_to_suites import (
     read_rules_excel,
     resolve_suites,

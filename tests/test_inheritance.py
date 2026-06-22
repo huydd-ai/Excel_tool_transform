@@ -5,9 +5,9 @@ unoverridden actions are inherited, hook attributes (IMPORTS, MODULE_PROLOGUE,
 wrap_main_body) are honored at generation time, and sibling classes do not
 share state.
 """
+
 import py_compile
 
-import pytest
 
 from excel_to_airtest import (
     AirtestGenerator,
@@ -21,8 +21,13 @@ from excel_to_airtest import (
 
 def _step(action_name, target="", params="", suite="S", step_no=1, row=2, expected=""):
     return Step(
-        suite_id=suite, step_no=step_no, action=action_name, excel_row=row,
-        target=target, params=params, expected=expected,
+        suite_id=suite,
+        step_no=step_no,
+        action=action_name,
+        excel_row=row,
+        target=target,
+        params=params,
+        expected=expected,
     )
 
 
@@ -33,6 +38,7 @@ def _ctx(assets=None, app_package=""):
 # --------------------------------------------------------------------------- #
 # Per-class registry semantics                                                #
 # --------------------------------------------------------------------------- #
+
 
 def test_subclass_inherits_parents_handlers():
     class Child(AirtestGenerator):
@@ -57,7 +63,8 @@ def test_subclass_override_replaces_parent_handler():
     # Parent's handler is unchanged — sibling/parent isolation.
     parent = AirtestGenerator()
     parent_lines, _ = AirtestGenerator._HANDLERS["CLICK"](
-        parent, _step("CLICK", target="b"),
+        parent,
+        _step("CLICK", target="b"),
         _ctx(assets={"b": Asset("b", resource_path="b.png")}),
     )
     # CLICK is deprecated — parent emits comment + touch line
@@ -77,7 +84,9 @@ def test_subclass_can_override_existing_action_keyword():
 
     src, issues = Child().generate_suite_script(
         [_step("SWIPE", params="dx=100")],
-        _ctx(), "x.xlsx", "S",
+        _ctx(),
+        "x.xlsx",
+        "S",
     )
     assert "swipe_stub('dx=100')" in src
     assert issues == []
@@ -105,13 +114,17 @@ def test_sibling_subclasses_do_not_share_registry_state():
 # Hook attributes shape generated script                                      #
 # --------------------------------------------------------------------------- #
 
+
 def test_imports_hook_lands_at_top_of_generated_script():
     class Child(AirtestGenerator):
         IMPORTS = "from my.framework import driver"
 
     assets = {"b": Asset("b", resource_path="b.png")}
     src, _ = Child().generate_suite_script(
-        [_step("CLICK", target="b")], _ctx(assets), "x.xlsx", "S",
+        [_step("CLICK", target="b")],
+        _ctx(assets),
+        "x.xlsx",
+        "S",
     )
     assert "from my.framework import driver" in src
     assert "from airtest.core.api" not in src
@@ -123,11 +136,14 @@ def test_module_prologue_hook_inserts_below_imports_above_main():
 
     assets = {"b": Asset("b", resource_path="b.png")}
     src, _ = Child().generate_suite_script(
-        [_step("CLICK", target="b")], _ctx(assets), "x.xlsx", "S",
+        [_step("CLICK", target="b")],
+        _ctx(assets),
+        "x.xlsx",
+        "S",
     )
-    pro_at  = src.index("page = MyPage()")
+    pro_at = src.index("page = MyPage()")
     main_at = src.index("def main():")
-    imp_at  = src.index(Child.IMPORTS.splitlines()[0])
+    imp_at = src.index(Child.IMPORTS.splitlines()[0])
     assert imp_at < pro_at < main_at
 
 
@@ -141,7 +157,10 @@ def test_wrap_main_body_hook_wraps_step_lines():
 
     assets = {"b": Asset("b", resource_path="b.png")}
     src, _ = Child().generate_suite_script(
-        [_step("CLICK", target="b")], _ctx(assets), "x.xlsx", "TC_X",
+        [_step("CLICK", target="b")],
+        _ctx(assets),
+        "x.xlsx",
+        "TC_X",
     )
     assert "with mycontext('TC_X'):" in src
     # And the result is still syntactically valid Python.
@@ -150,7 +169,7 @@ def test_wrap_main_body_hook_wraps_step_lines():
 
 def test_subclass_generated_script_is_syntactically_valid(tmp_path):
     class Child(AirtestGenerator):
-        IMPORTS         = "import sys"
+        IMPORTS = "import sys"
         MODULE_PROLOGUE = "ROOT = '/tmp'"
 
         def wrap_main_body(self, step_lines, suite_id):
@@ -165,7 +184,9 @@ def test_subclass_generated_script_is_syntactically_valid(tmp_path):
 
     src, _ = Child().generate_suite_script(
         [_step("CLICK", target="a"), _step("CLICK", target="b", step_no=2)],
-        _ctx(), "x.xlsx", "TC_X",
+        _ctx(),
+        "x.xlsx",
+        "TC_X",
     )
     out = tmp_path / "out.py"
     out.write_text(src, encoding="utf-8")
@@ -176,10 +197,14 @@ def test_subclass_generated_script_is_syntactically_valid(tmp_path):
 # Backward-compat surface                                                     #
 # --------------------------------------------------------------------------- #
 
+
 def test_module_level_generate_suite_script_uses_default_generator():
     """Legacy module-level function still works for callers that pre-date the class."""
     assets = {"b": Asset("b", resource_path="b.png")}
     src, _ = generate_suite_script(
-        [_step("CLICK", target="b")], _ctx(assets), "x.xlsx", "S",
+        [_step("CLICK", target="b")],
+        _ctx(assets),
+        "x.xlsx",
+        "S",
     )
     assert "touch(Template('b.png'" in src

@@ -1,7 +1,8 @@
 """Pure helper functions: _safe_name / _blank / _str / _int / _float."""
+
 import math
 
-from excel_to_airtest import _blank, _float, _int, _safe_name, _str
+from parsers import _blank, _float, _int, safe_name as _safe_name, _str
 
 
 def test_safe_name_preserves_valid_chars():

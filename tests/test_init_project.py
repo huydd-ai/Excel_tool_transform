@@ -1,10 +1,11 @@
 """Tests for --init-project scaffold."""
-import os
+
 import py_compile
 
 import pytest
 
-from excel_to_airtest import AirtestGenerator, _PROJECT_REGISTRY, _scaffold_project, register_project
+from registry import _PROJECT_REGISTRY
+from cli import scaffold_project as _scaffold_project
 
 
 @pytest.fixture(autouse=True)

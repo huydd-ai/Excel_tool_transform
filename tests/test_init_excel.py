@@ -1,9 +1,9 @@
 """--init-excel generates a valid template.xlsx with 3 sheets and action dropdown."""
+
 import os
 import sys
 
 import openpyxl
-import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -28,7 +28,13 @@ def test_object_repository_headers(tmp_path):
     wb = openpyxl.load_workbook(out)
     ws = wb["Object_Repository"]
     headers = [ws.cell(1, c).value for c in range(1, 6)]
-    assert headers == ["Object_ID", "Locator_Type", "Resource_Path", "Smart_Threshold", "Timeout"]
+    assert headers == [
+        "Object_ID",
+        "Locator_Type",
+        "Resource_Path",
+        "Smart_Threshold",
+        "Timeout",
+    ]
 
 
 def test_object_repository_has_example_rows(tmp_path):
@@ -44,7 +50,14 @@ def test_test_execution_headers(tmp_path):
     wb = openpyxl.load_workbook(out)
     ws = wb["Test_Execution"]
     headers = [ws.cell(1, c).value for c in range(1, 7)]
-    assert headers == ["Suite_ID", "Step", "Action_Keyword", "Target_ID", "Params", "Expected_Result"]
+    assert headers == [
+        "Suite_ID",
+        "Step",
+        "Action_Keyword",
+        "Target_ID",
+        "Params",
+        "Expected_Result",
+    ]
 
 
 def test_test_execution_has_example_rows(tmp_path):

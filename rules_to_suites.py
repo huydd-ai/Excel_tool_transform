@@ -552,7 +552,9 @@ def generate_all(
         script, issues = gen.generate_suite_script(
             sd.steps, ctx, source_name, sd.suite_id
         )
-        out_path = gen.write_suite(script, plan_dir, sd.suite_id)
+        from writer import write_suite
+
+        out_path = write_suite(script, plan_dir, sd.suite_id)
         written.append((sd.suite_id, out_path))
         gen_issues.extend(issues)
 

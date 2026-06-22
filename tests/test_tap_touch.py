@@ -1,6 +1,8 @@
 """TAP and TOUCH produce identical touch() code. CLICK is a deprecated alias."""
+
 import pytest
-from excel_to_airtest import AirtestGenerator, Asset, GenCtx, Step, LOCATOR_IMAGE
+from excel_to_airtest import AirtestGenerator
+from models import Asset, GenCtx, Step, LOCATOR_IMAGE
 
 
 @pytest.fixture
@@ -9,8 +11,15 @@ def gen():
 
 
 def _step(action, target="btn", suite="S", step_no=1, row=2):
-    return Step(suite_id=suite, step_no=step_no, action=action,
-                excel_row=row, target=target, params="", expected="")
+    return Step(
+        suite_id=suite,
+        step_no=step_no,
+        action=action,
+        excel_row=row,
+        target=target,
+        params="",
+        expected="",
+    )
 
 
 def _ctx():
@@ -60,17 +69,33 @@ def test_click_output_contains_deprecated_comment():
 
 def test_tap_missing_target_returns_todo():
     from models import AirtestError
+
     gen = AirtestGenerator()
-    step = Step(suite_id="S", step_no=1, action="TAP", excel_row=2,
-                target="", params="", expected="")
+    step = Step(
+        suite_id="S",
+        step_no=1,
+        action="TAP",
+        excel_row=2,
+        target="",
+        params="",
+        expected="",
+    )
     with pytest.raises(AirtestError, match="MISSING_TARGET"):
         gen._HANDLERS["TAP"](gen, step, _ctx())
 
 
 def test_touch_missing_target_returns_todo():
     from models import AirtestError
+
     gen = AirtestGenerator()
-    step = Step(suite_id="S", step_no=1, action="TOUCH", excel_row=2,
-                target="", params="", expected="")
+    step = Step(
+        suite_id="S",
+        step_no=1,
+        action="TOUCH",
+        excel_row=2,
+        target="",
+        params="",
+        expected="",
+    )
     with pytest.raises(AirtestError, match="MISSING_TARGET"):
         gen._HANDLERS["TOUCH"](gen, step, _ctx())

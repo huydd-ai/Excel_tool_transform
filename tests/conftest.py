@@ -3,6 +3,7 @@
 Puts the project root on sys.path so tests can `import excel_to_airtest`
 without an editable install.
 """
+
 import os
 import sys
 
@@ -14,13 +15,32 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 
-_OBJ_HEADERS  = ["Object_ID", "Locator_Type", "Resource_Path", "Smart_Threshold", "Timeout"]
-_ACT_HEADERS  = ["Logic_ID", "Action_Name", "Machine_Command", "Target_Page"]
-_STEP_HEADERS = ["Suite_ID", "Step", "Action_Keyword", "Target_ID", "Params", "Expected_Result"]
+_OBJ_HEADERS = [
+    "Object_ID",
+    "Locator_Type",
+    "Resource_Path",
+    "Smart_Threshold",
+    "Timeout",
+]
+_ACT_HEADERS = ["Logic_ID", "Action_Name", "Machine_Command", "Target_Page"]
+_STEP_HEADERS = [
+    "Suite_ID",
+    "Step",
+    "Action_Keyword",
+    "Target_ID",
+    "Params",
+    "Expected_Result",
+]
 
 
-def _build_wb(objects=None, actions=None, steps=None,
-              obj_headers=None, act_headers=None, step_headers=None):
+def _build_wb(
+    objects=None,
+    actions=None,
+    steps=None,
+    obj_headers=None,
+    act_headers=None,
+    step_headers=None,
+):
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
     if objects is not None:
@@ -50,9 +70,11 @@ def make_wb():
 @pytest.fixture
 def make_wb_file(tmp_path, make_wb):
     """Return a builder that writes the Workbook to a temp file and returns its Path."""
+
     def _builder(**kw):
         wb = make_wb(**kw)
         path = tmp_path / "wb.xlsx"
         wb.save(path)
         return path
+
     return _builder
