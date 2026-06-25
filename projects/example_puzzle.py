@@ -48,6 +48,10 @@ class ExamplePuzzleGenerator(AirtestGenerator):
         (snapshot), so the output stays framework-free.
         """
         body = step_lines or ["pass"]
+        # If the suite resolved to comment-only lines (e.g. all-TODO steps), the
+        # try-block would be syntactically empty — keep it valid with a pass.
+        if not any(line and not line.lstrip().startswith("#") for line in body):
+            body = [*body, "pass"]
         out = ["try:"]
         out += [f"    {line}" for line in body]
         out += [

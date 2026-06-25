@@ -66,3 +66,16 @@ def test_example_puzzle_generates_valid_framework_free_script():
     # No game framework leaked into generated output.
     assert "pixon" not in script
     assert "wrapper." not in script
+
+
+def test_example_puzzle_comment_only_suite_is_valid_python():
+    """A suite whose steps all resolve to comments (e.g. READ_TEXT TODO) must
+    still produce a syntactically valid try-block, not an empty one."""
+    mod = _load_example()
+    gen = mod.ExamplePuzzleGenerator()
+    steps = [Step("TC_TODO", 1, "READ_TEXT", 2, "score_text", "", "read score")]
+    script, _ = gen.generate_suite_script(steps, _ctx(), "demo.xlsx", "TC_TODO")
+
+    ast.parse(script)  # would raise SyntaxError on an empty try-block
+    assert "try:" in script
+    assert "pass" in script  # guard line keeps the try-block non-empty
