@@ -74,7 +74,7 @@ def _write_object_repository(ws):
     _header_row(ws, headers)
     examples = [
         ("btn_play", "IMAGE", "./assets/home/btn_play.png", 0.85, 5),
-        ("heart_count", "OCR", "NONE", 0.70, 10),
+        ("score_text", "OCR", "NONE", 0.70, 10),
         ("btn_close", "IMAGE", "./assets/popup/btn_close.png", 0.90, 3),
     ]
     for i, row in enumerate(examples, 2):
@@ -111,7 +111,7 @@ def _write_test_execution(ws):
             1,
             "START_APP",
             "",
-            '{"heart":"5","level":"1"}',
+            "",
             "App opens",
         ),
         ("TC_EXAMPLE_LOGIN", 2, "WAIT_FOR", "btn_play", "", "Home screen loaded"),

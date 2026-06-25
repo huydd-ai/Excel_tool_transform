@@ -113,7 +113,7 @@ def list_projects() -> None:
         print("No projects registered.")
         return
     for name in sorted(_PROJECT_REGISTRY):
-        print(f"  {name}  →  {_PROJECT_REGISTRY[name].__name__}")
+        print(f"  {name}  ->  {_PROJECT_REGISTRY[name].__name__}")
 
 
 def register_project(name: str) -> Callable:

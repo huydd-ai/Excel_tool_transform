@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "excel-tool"
 version = "0.1.0"
-description = "Convert AutomationRebase Excel workbooks to Airtest .air scripts"
+description = "Convert structured test-plan Excel workbooks to Airtest .air scripts"
 requires-python = ">=3.10"
 dependencies = ["openpyxl>=3.1"]
 

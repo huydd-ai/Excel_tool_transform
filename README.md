@@ -1,7 +1,9 @@
 # Excel Tool Transform
 
-Convert a structured Excel test plan (the **AutomationRebase** schema) into runnable
+Convert a structured Excel test plan into runnable
 [Airtest](https://airtest.netease.com/) `.air` scripts — **one `.air` per `Suite_ID`**.
+The tool is game-agnostic: it ships a generic puzzle-game example and you add your
+own game as a one-file plugin under `projects/`.
 The same workbook can describe many test cases across many projects; per-project
 differences (e.g. the Android package id) come from CLI flags.
 
@@ -68,11 +70,11 @@ python excel_to_airtest.py MyPlan.xlsx --project mygame --report
 ### Example
 
 ```bash
-# Pixon project (pre-configured in projects/pixon.py)
-python excel_to_airtest.py AutomationRebase.xlsx --project pixon --report
+# Generic example project (ships in projects/example_puzzle.py)
+python excel_to_airtest.py MyPlan.xlsx --project example_puzzle --report
 
 # Base Airtest (no project selected)
-python excel_to_airtest.py Plan.xlsx --app-package com.my.game
+python excel_to_airtest.py MyPlan.xlsx --app-package com.my.game
 ```
 
 ## Excel Schema
@@ -84,7 +86,7 @@ Headers are matched **case-insensitively**.
 | Object_ID | Locator_Type | Resource_Path | Smart_Threshold | Timeout |
 |-----------|--------------|---------------|-----------------|---------|
 | `btn_play` | `IMAGE` | `./assets/home/btn_play.png` | `0.85` | `3` |
-| `heart_count` | `OCR` | `NONE` | `0.7` | `10` |
+| `score_text` | `OCR` | `NONE` | `0.7` | `10` |
 
 - `Locator_Type`: `IMAGE` (template-matching) or `OCR` (text). OCR rows currently emit
   TODO stubs in the generated script — implement per project as needed.
@@ -108,10 +110,10 @@ Headers are matched **case-insensitively**.
 
 | Suite_ID | Step | Action_Keyword | Target_ID | Params | Expected_Result |
 |----------|------|----------------|-----------|--------|-----------------|
-| `TC_MISSION_1_CHECKHEART` | 1 | `CLICK`          | `btn_play`     |  | Open game |
-| `TC_MISSION_1_CHECKHEART` | 2 | `START_APP`      |                | `{"heart": "5", "coin": "10000", "level": "3"}` | Cold start with config |
-| `TC_MISSION_1_CHECKHEART` | 3 | `WAIT_FOR`       | `btn_main_home`|  | Home loaded |
-| `TC_MISSION_1_CHECKHEART` | 4 | `ASSERT_VISIBLE` | `heart_count`  |  | Heart visible |
+| `TC_LEVEL_START` | 1 | `START_APP`      |                | `{}` | Cold start |
+| `TC_LEVEL_START` | 2 | `WAIT_FOR`       | `btn_main_home`|  | Home loaded |
+| `TC_LEVEL_START` | 3 | `TAP`            | `btn_play`     |  | Open game |
+| `TC_LEVEL_START` | 4 | `ASSERT_VISIBLE` | `score_text`   |  | Score visible |
 
 - All steps sharing a `Suite_ID` go into one generated `.air` script.
 - `Params` is free-form text; for `START_APP` it should be a JSON object.
@@ -194,12 +196,14 @@ Edit the 2–3 lines marked `← change this`. Run `--list-projects` to verify.
 
 Same hooks as before — `IMPORTS`, `MODULE_PROLOGUE`, `DEFAULT_APP_PACKAGE`, `wrap_main_body()`, `@action("NAME")` handlers, `add_arguments()`.
 
-### Example: `projects/pixon.py`
+### Example: `projects/example_puzzle.py`
 
-The repo ships one concrete subclass targeting the `pixon` framework. It overrides `TAP`/`TOUCH`/`WAIT_FOR`/`ASSERT_VISIBLE`/`START_APP`/`wrap_main_body` to route through `wrapper.*` and `TestCaseTimer`.
+The repo ships one generic subclass targeting **bare Airtest**. It sets a neutral
+`DEFAULT_APP_PACKAGE` and overrides `wrap_main_body` to snapshot on failure — copy it
+as the starting point for your own game.
 
 ```bash
-python excel_to_airtest.py AutomationRebase.xlsx --project pixon --report
+python excel_to_airtest.py MyPlan.xlsx --project example_puzzle --report
 ```
 
 ### Adding a new project
@@ -226,10 +230,6 @@ if __name__ == "__main__":
     Game2Generator.main()
 ```
 
-### generators/ (deprecated)
-
-The old `generators/pixon_generator.py` is now a backward-compatibility shim that imports from `projects/pixon.py`. New projects go in `projects/`.
-
 ### Schema column changes
 
 Required headers live at the top of the parser section (`_REQUIRED_*_HEADERS`).
@@ -238,7 +238,7 @@ Headers are normalised lowercase, so renaming a workbook column is a one-line ch
 ## Roadmap
 
 ### Approved (v1)
-- [x] Excel (AutomationRebase schema) -> Airtest `.air` script generation
+- [x] Excel test-plan -> Airtest `.air` script generation
 - [x] Multi-suite output (one `.air` per `Suite_ID`)
 - [x] `Object_Repository` with `Locator_Type` and per-object `Timeout`
 - [x] `Action_Logic` registry + flow reference
@@ -246,7 +246,7 @@ Headers are normalised lowercase, so renaming a workbook column is a one-line ch
 - [x] Asset disk validation
 - [x] Generation report with Excel row context
 - [x] Pytest suite (helpers, parsers, handlers, generator, CLI end-to-end, injection, inheritance)
-- [x] Class-based architecture — one subclass file per project (`generators/pixon_generator.py` ships as the canonical example)
+- [x] Class-based architecture — one subclass file per project (`projects/example_puzzle.py` ships as the generic example)
 
 ### Future (pending approval)
 - [ ] OCR locator support (real implementation, not stub)

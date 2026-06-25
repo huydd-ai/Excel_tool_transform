@@ -43,10 +43,6 @@ HINT_MAP: dict[str, str] = {
     ),
     # Feature gaps
     "READ_TEXT": ("READ_TEXT is a v2 feature — leave as TODO stub for now"),
-    "SERVER_VALIDATION": (
-        "server-side rule — requires manual verification or backend integration"
-    ),
-    "MANUAL_TIMER_CHECK": ("long timer — skip in automation, verify manually"),
 }
 
 # ── Version-specific Overrides ────────────────────────────────────────────────
