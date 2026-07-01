@@ -32,6 +32,14 @@ ALL_KEYWORDS = [
     "BACK",
     "HOME",
     "SNAPSHOT",
+    # Lava Quest specific
+    "ADVANCE_TIME",
+    "SET_PARAM",
+    "VERIFY_COUNTDOWN",
+    "INITIALIZE_QUEST",
+    "PLAY_AND_WIN_LEVELS",
+    "OPEN_LQ_POPUP",
+    "CLAIM_REWARD",
 ]
 
 
@@ -118,6 +126,22 @@ def _write_test_execution(ws):
         ("TC_EXAMPLE_LOGIN", 3, "TAP", "btn_play", "", "Game starts"),
         ("TC_EXAMPLE_LOGIN", 4, "SLEEP", "", "2", "Wait for animation"),
         ("TC_EXAMPLE_LOGIN", 5, "SNAPSHOT", "", "after_tap", "Screenshot saved"),
+        # Lava Quest specific examples
+        (
+            "TC_LAVA_QUEST_REWARD",
+            1,
+            "ADVANCE_TIME",
+            "",
+            '{"hours": 25.0}',
+            "Advance time to expire old events",
+        ),
+        ("TC_LAVA_QUEST_REWARD", 2, "START_APP", "", '{"level": 27}', "Cold start at level 27"),
+        ("TC_LAVA_QUEST_REWARD", 3, "SLEEP", "", "30", "Wait for app launch"),
+        ("TC_LAVA_QUEST_REWARD", 4, "INITIALIZE_QUEST", "", "", "First-time LQ flow completed"),
+        ("TC_LAVA_QUEST_REWARD", 5, "PLAY_AND_WIN_LEVELS", "", '{"count": 7}', "Play and win 7 levels"),
+        ("TC_LAVA_QUEST_REWARD", 6, "OPEN_LQ_POPUP", "", "", "LQ popup opens with claim button"),
+        ("TC_LAVA_QUEST_REWARD", 7, "CLAIM_REWARD", "", '{"expected_split": 5000}', "Reward claimed, win banner verified"),
+        ("TC_LAVA_QUEST_REWARD", 8, "VERIFY_COUNTDOWN", "", "", "24h cooldown timer visible"),
     ]
     for i, row in enumerate(examples, 2):
         for j, val in enumerate(row, 1):
