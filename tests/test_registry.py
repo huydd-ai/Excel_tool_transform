@@ -95,7 +95,7 @@ def test_discover_projects_skips_dunder_files(tmp_path):
 
 
 def test_classname_from_name():
-    assert _classname_from_name("pixon") == "Pixon"
+    assert _classname_from_name("puzzle") == "Puzzle"
     assert _classname_from_name("my_game") == "MyGame"
     assert _classname_from_name("my-game") == "MyGame"
     assert _classname_from_name("my game") == "MyGame"

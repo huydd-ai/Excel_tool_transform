@@ -43,7 +43,7 @@ class AirtestGenerator(metaclass=_GenMeta):
 
     # === CLI defaults (subclass may rebind) ============================= #
     DESCRIPTION = (
-        "Convert AutomationRebase Excel to Airtest .air scripts (one per Suite_ID)."
+        "Convert a structured test-plan Excel to Airtest .air scripts (one per Suite_ID)."
     )
     DEFAULT_APP_PACKAGE = ""
     DEFAULT_PLAN = None

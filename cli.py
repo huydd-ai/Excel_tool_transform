@@ -100,7 +100,7 @@ def scaffold_project(name: str, projects_dir: str | None = None) -> str:
 
 
 def build_parser(
-    description: str = "Convert AutomationRebase Excel to Airtest .air scripts (one per Suite_ID).",
+    description: str = "Convert a structured test-plan Excel to Airtest .air scripts (one per Suite_ID).",
     default_app_package: str = "",
     default_plan_name: str = "",
 ) -> argparse.ArgumentParser:
